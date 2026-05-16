@@ -7,58 +7,105 @@ import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.util.Mth;
+import org.lwjgl.glfw.GLFW;
 
 public class WSlider extends WElement {
+    private static final int INPUT_W = 38;
+    private static final int GAP = 4;
+
     private double value;
     private double min, max;
     private String label;
     private boolean dragging;
     private double dragStartValue;
 
+    private final int barWidth;
+    private boolean inputFocused;
+    private String inputBuffer = "";
+
     public WSlider(String label, double min, double max, int width) {
         this.label = label;
         this.min = min;
         this.max = max;
-        this.width = width;
+        this.barWidth = width;
+        this.width = width + GAP + INPUT_W;
         this.height = 14;
         this.value = min;
     }
 
     @Override
     public void render(GuiGraphics graphics, int x, int y, int mouseX, int mouseY, float partialTick) {
-        boolean hovered = mouseX >= x && mouseX <= x + width && mouseY >= y && mouseY <= y + height;
-        
+        boolean barHovered = mouseX >= x && mouseX <= x + barWidth && mouseY >= y && mouseY <= y + height;
+
         if (dragging) {
-            double relX = (mouseX - x) / (double) width;
+            double relX = (mouseX - x) / (double) barWidth;
             value = min + Mth.clamp(relX, 0, 1) * (max - min);
+            if (!inputFocused) {
+                inputBuffer = formatValue(value);
+            }
         }
 
         // Background
-        graphics.fill(x, y + 4, x + width, y + 10, 0xFF121212);
-        graphics.renderOutline(x, y + 4, width, 6, 0xFF444444);
-        
+        graphics.fill(x, y + 4, x + barWidth, y + 10, 0xFF121212);
+        graphics.renderOutline(x, y + 4, barWidth, 6, 0xFF444444);
+
         // Fill
-        int fillW = (int) ((value - min) / (max - min) * width);
+        int fillW = (int) ((value - min) / (max - min) * barWidth);
         graphics.fill(x, y + 4, x + fillW, y + 10, 0xAA00FF88);
-        
+
         // Knob
-        graphics.fill(x + fillW - 2, y + 2, x + fillW + 2, y + 12, hovered || dragging ? 0xFFFFFFFF : 0xFF00FF88);
-        
-        // Label and Value
-        String text = String.format("%s: %.2f", label, value);
-        graphics.drawString(net.minecraft.client.Minecraft.getInstance().font, text, x, y - 8, 0xFF888888);
+        graphics.fill(x + fillW - 2, y + 2, x + fillW + 2, y + 12, barHovered || dragging ? 0xFFFFFFFF : 0xFF00FF88);
+
+        // Label (above)
+        Minecraft mc = Minecraft.getInstance();
+        String text = String.format("%s: %s", label, formatValue(value));
+        graphics.drawString(mc.font, text, x, y - 8, 0xFF888888);
+
+        // Input box (right)
+        int ix = x + barWidth + GAP;
+        int iy = y + 2;
+        int ih = 10;
+        graphics.fill(ix, iy, ix + INPUT_W, iy + ih, 0xFF000000);
+        graphics.renderOutline(ix, iy, INPUT_W, ih, inputFocused ? 0xFF00FF88 : 0xFF666666);
+        String shown = inputFocused ? inputBuffer : formatValue(value);
+        int textW = mc.font.width(shown);
+        int tx = ix + Math.max(2, INPUT_W - 3 - textW);
+        int ty = iy + 1;
+        graphics.drawString(mc.font, shown, tx, ty, inputFocused ? 0xFFFFFFFF : 0xFFCCCCCC, false);
+        if (inputFocused && (System.currentTimeMillis() / 500) % 2 == 0) {
+            int cx = tx + textW;
+            graphics.fill(cx, ty - 1, cx + 1, ty + mc.font.lineHeight, 0xFFFFFFFF);
+        }
     }
 
     @Override
     public boolean handleMouseClick(double mouseX, double mouseY, int button) {
-        if (button == 0 && mouseX >= 0 && mouseX <= width && mouseY >= 0 && mouseY <= height) {
+        if (button != 0) {
+            return false;
+        }
+        boolean onBar = mouseX >= 0 && mouseX <= barWidth && mouseY >= 0 && mouseY <= height;
+        int ix = barWidth + GAP;
+        boolean onInput = mouseX >= ix && mouseX <= ix + INPUT_W && mouseY >= 0 && mouseY <= height;
+
+        if (onBar) {
+            commitInputIfFocused();
+            inputFocused = false;
             dragging = true;
             dragStartValue = value;
-            Minecraft mc = Minecraft.getInstance();
-            if (mc != null) {
-                mc.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 1.03f));
-            }
+            playClick(1.03f);
             return true;
+        }
+        if (onInput) {
+            if (!inputFocused) {
+                inputBuffer = formatValue(value);
+            }
+            inputFocused = true;
+            playClick(1.0f);
+            return true;
+        }
+        if (inputFocused) {
+            commitInputIfFocused();
+            inputFocused = false;
         }
         return false;
     }
@@ -66,17 +113,88 @@ public class WSlider extends WElement {
     @Override
     public boolean handleMouseRelease(double mouseX, double mouseY, int button) {
         if (dragging && Math.abs(value - dragStartValue) > 1.0e-6) {
-            Minecraft mc = Minecraft.getInstance();
-            if (mc != null) {
-                mc.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 0.95f));
-            }
+            playClick(0.95f);
         }
         dragging = false;
         return false;
     }
 
-    public double getValue() { return value; }
-    public void setValue(double value) { this.value = value; }
+    @Override
+    public boolean handleKeyPress(int keyCode, int scanCode, int modifiers) {
+        if (!inputFocused) {
+            return false;
+        }
+        if (keyCode == GLFW.GLFW_KEY_BACKSPACE) {
+            if (!inputBuffer.isEmpty()) {
+                inputBuffer = inputBuffer.substring(0, inputBuffer.length() - 1);
+            }
+            return true;
+        }
+        if (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER) {
+            commitInputIfFocused();
+            inputFocused = false;
+            return true;
+        }
+        if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
+            inputBuffer = formatValue(value);
+            inputFocused = false;
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    public boolean handleCharTyped(char codePoint, int modifiers) {
+        if (!inputFocused) {
+            return false;
+        }
+        if ((codePoint >= '0' && codePoint <= '9') || codePoint == '.' || codePoint == '-') {
+            inputBuffer = inputBuffer + codePoint;
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    public boolean isFocused() {
+        return inputFocused;
+    }
+
+    private void commitInputIfFocused() {
+        if (!inputFocused) {
+            return;
+        }
+        String s = inputBuffer.trim().replace(',', '.');
+        if (s.isEmpty() || s.equals("-") || s.equals(".") || s.equals("-.")) {
+            inputBuffer = formatValue(value);
+            return;
+        }
+        try {
+            double parsed = Double.parseDouble(s);
+            value = Mth.clamp(parsed, min, max);
+        } catch (NumberFormatException ignored) {
+            // keep current value
+        }
+        inputBuffer = formatValue(value);
+    }
+
+    private static String formatValue(double v) {
+        if (Math.abs(v - Math.rint(v)) < 1.0e-6) {
+            return String.valueOf((long) Math.rint(v));
+        }
+        return String.format("%.2f", v);
+    }
+
+    public double getValue() {
+        return value;
+    }
+
+    public void setValue(double value) {
+        this.value = Mth.clamp(value, min, max);
+        if (!inputFocused) {
+            inputBuffer = formatValue(this.value);
+        }
+    }
 
     @Override
     public CompoundTag save() {
@@ -89,6 +207,14 @@ public class WSlider extends WElement {
     public void load(CompoundTag tag) {
         if (tag.contains("value")) {
             value = Mth.clamp(tag.getDouble("value"), min, max);
+            inputBuffer = formatValue(value);
+        }
+    }
+
+    private static void playClick(float pitch) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc != null) {
+            mc.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), pitch));
         }
     }
 }

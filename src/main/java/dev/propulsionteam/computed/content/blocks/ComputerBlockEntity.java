@@ -71,9 +71,13 @@ public class ComputerBlockEntity extends BaseContainerBlockEntity {
         be.refreshRedstoneFromGraph();
     }
 
-    /** Redstone wire / blocks query this from the neighbor toward the computer. */
-    public int getEmittedRedstone(Direction towardNeighbor) {
-        return redstoneEmitted[towardNeighbor.ordinal()];
+    /**
+     * Returns the weak signal emitted from the given face of the computer. Minecraft's
+     * {@code getSignal(..., direction)} passes {@code direction} as the direction from the querying
+     * neighbor toward this block, so the face being queried is its opposite.
+     */
+    public int getEmittedRedstone(Direction fromNeighborTowardSelf) {
+        return redstoneEmitted[fromNeighborTowardSelf.getOpposite().ordinal()];
     }
 
     /** Zeros outputs for peripheral nodes with no matching item in this computer (including nested function graphs). */
@@ -98,6 +102,8 @@ public class ComputerBlockEntity extends BaseContainerBlockEntity {
         int[] next = new int[6];
         List<RedstonePortNode> ports = new ArrayList<>();
         collectRedstonePorts(graph, ports);
+        BlockState st = getBlockState();
+        Direction facing = st.getValue(ComputerBlock.FACING);
         for (RedstonePortNode rp : ports) {
             if (!hasPeripheralEquipped(RedstonePortNode.TYPE_ID)) {
                 continue;
@@ -110,14 +116,13 @@ public class ComputerBlockEntity extends BaseContainerBlockEntity {
             double lv = n.getInputs().get(1).getValue();
             if (tick > 0.5) {
                 int p = net.minecraft.util.Mth.clamp((int) Math.round(lv), 0, 15);
-                int o = rp.getEmitDirection().ordinal();
+                int o = rp.getEmitFace().toWorld(facing).ordinal();
                 next[o] = Math.max(next[o], p);
             }
         }
         if (!Arrays.equals(next, redstoneEmitted)) {
             System.arraycopy(next, 0, redstoneEmitted, 0, 6);
             setChanged();
-            BlockState st = getBlockState();
             lvl.updateNeighborsAt(worldPosition, st.getBlock());
             for (Direction d : Direction.values()) {
                 lvl.neighborChanged(worldPosition.relative(d), st.getBlock(), worldPosition);

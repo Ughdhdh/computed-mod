@@ -292,6 +292,30 @@ public final class InternalNodes {
             return node;
         });
 
+        NodeRegistry.register(id("pulse"), (x, y) -> {
+            WNode node = new WNode(id("pulse"), "Pulse", x, y);
+            node.addOutput("Tick", 0xFF00FF88);
+            WSlider cooldown = new WSlider("Cooldown (ticks)", 1, 20, 100);
+            cooldown.setValue(20);
+            node.addElement(new WLabel("Pulses 1.0 every N ticks"));
+            node.addElement(cooldown);
+            int[] phase = {0};
+            node.setEvaluator(n -> {
+                int cd = (int) cooldown.getValue();
+                if (cd <= 0) {
+                    n.getOutputs().get(0).setValue(1.0);
+                    phase[0] = 0;
+                    return;
+                }
+                WGraph g = n.evaluationGraph();
+                if (g != null && g.isEvalTickPulseGate()) {
+                    phase[0] = (phase[0] + 1) % (2 * cd);
+                }
+                n.getOutputs().get(0).setValue(phase[0] < cd ? 1.0 : 0.0);
+            });
+            return node;
+        });
+
         NodeRegistry.register(CounterNode.TYPE_ID, CounterNode::new);
         NodeRegistry.register(PassOnNthRisingEdgeNode.TYPE_ID, PassOnNthRisingEdgeNode::new);
 
@@ -376,6 +400,7 @@ public final class InternalNodes {
 
         add(CAT_SOURCES, "constant", "Constant");
         add(CAT_SOURCES, "tick", "Tick");
+        add(CAT_SOURCES, "pulse", "Pulse");
         add(CAT_SOURCES, "oscillator", "Oscillator");
         add(CAT_SOURCES, "counter", "Counter");
         add(CAT_SOURCES, "pass_every_n", "Pass on Nth rise");

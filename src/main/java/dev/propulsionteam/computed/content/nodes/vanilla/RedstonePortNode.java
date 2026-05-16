@@ -10,14 +10,15 @@ import net.minecraft.resources.ResourceLocation;
 
 /**
  * Peripheral node: when Tick input &gt; 0.5, emits weak redstone toward the chosen face of the computer block.
+ * The face is block-relative (Front/Back/Left/Right/Top/Bottom) and resolved against block facing at emit time.
  */
 public final class RedstonePortNode extends WNode {
 
     public static final ResourceLocation TYPE_ID =
             ResourceLocation.fromNamespaceAndPath(Computed.MODID, "redstone_emitter");
 
-    private Direction emitFace = Direction.NORTH;
-    private final WDropdown<Direction> faceDropdown;
+    private RelativeFace emitFace = RelativeFace.FRONT;
+    private final WDropdown<RelativeFace> faceDropdown;
 
     public RedstonePortNode(int x, int y) {
         super(TYPE_ID, "Redstone", x, y);
@@ -25,23 +26,23 @@ public final class RedstonePortNode extends WNode {
         addInput("Level", 0xFFFF6655);
         faceDropdown = new WDropdown<>(
                 88,
-                List.of(Direction.values()),
-                d -> "Face: " + d.getName(),
+                List.of(RelativeFace.values()),
+                f -> "Face: " + f.displayName(),
                 emitFace,
-                d -> emitFace = d);
+                f -> emitFace = f);
         addElement(faceDropdown);
         addElement(new WLabel("Weak power 0-15 to neighbor", 0xFF888888));
         setEvaluator(n -> {});
     }
 
-    public Direction getEmitDirection() {
+    public RelativeFace getEmitFace() {
         return emitFace;
     }
 
     @Override
     public net.minecraft.nbt.CompoundTag save() {
         net.minecraft.nbt.CompoundTag tag = super.save();
-        tag.putString("computedEmitFace", emitFace.getName());
+        tag.putString("computedEmitFace", emitFace.name());
         return tag;
     }
 
@@ -49,7 +50,16 @@ public final class RedstonePortNode extends WNode {
     public void load(net.minecraft.nbt.CompoundTag tag) {
         super.load(tag);
         if (tag.contains("computedEmitFace")) {
-            Direction parsed = Direction.byName(tag.getString("computedEmitFace"));
+            String raw = tag.getString("computedEmitFace");
+            RelativeFace parsed = null;
+            try {
+                parsed = RelativeFace.valueOf(raw);
+            } catch (IllegalArgumentException ignored) {
+                Direction legacy = Direction.byName(raw);
+                if (legacy != null) {
+                    parsed = RelativeFace.fromLegacyDirection(legacy);
+                }
+            }
             if (parsed != null) {
                 emitFace = parsed;
                 faceDropdown.setSelected(parsed);

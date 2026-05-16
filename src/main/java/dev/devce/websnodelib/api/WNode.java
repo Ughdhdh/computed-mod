@@ -155,6 +155,7 @@ public class WNode {
      * @param partialTick Animation frame fraction.
      */
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        updateLayout();
         boolean isHovered = mouseX >= x && mouseX <= x + width && mouseY >= y && mouseY <= y + height;
 
         // Shadow/Glow

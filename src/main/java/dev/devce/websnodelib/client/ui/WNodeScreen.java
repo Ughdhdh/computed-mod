@@ -249,7 +249,7 @@ public class WNodeScreen extends Screen {
     /** Like {@link dev.devce.websnodelib.api.elements.WTextField}: selection is active when this differs from cursor. */
     private int sectionRenameCursor = 0;
     private int sectionRenameSelectionPos = 0;
-    private boolean showSectionsSidebar = true;
+    private boolean showSectionsSidebar = false;
     private static final long SECTION_DOUBLE_CLICK_MS = 280;
     /** Compact function library list inside schematic dropdown (similar rhythm to sections sidebar). */
     private static final int FUNCTION_LIB_PANEL_W = 154;
@@ -3299,7 +3299,7 @@ public class WNodeScreen extends Screen {
         graphics.drawString(font, "Add node", menuX + 4, menuY + 4, 0xFF669966, false);
         graphics.drawString(
                 font,
-                "> " + searchQuery + "_",
+                "> " + searchQuery + (((System.currentTimeMillis() / 500) % 2 == 0) ? "_" : " "),
                 menuX + 4,
                 menuY + 4 + menuRowHeight(),
                 0xFF00FF88,
@@ -3352,7 +3352,7 @@ public class WNodeScreen extends Screen {
         graphics.drawString(font, "Filter (all categories)", menuX + 4, menuY + 4, 0xFF669966, false);
         graphics.drawString(
                 font,
-                "> " + searchQuery + "_",
+                "> " + searchQuery + (((System.currentTimeMillis() / 500) % 2 == 0) ? "_" : " "),
                 menuX + 4,
                 menuY + 4 + menuRowHeight(),
                 0xFF00FF88,
