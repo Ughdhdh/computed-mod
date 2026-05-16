@@ -4138,7 +4138,6 @@ public class WNodeScreen extends Screen {
                 }
             }
         }
-        if (button == 2 || (button == 1 && Screen.hasShiftDown())) { isPanning = true; return true; }
         for (int i = graph.getNodes().size() - 1; i >= 0; i--) {
             WNode node = graph.getNodes().get(i);
             int outPin = node.getPinAt(nx - node.getX(), ny - node.getY(), false);
@@ -4172,8 +4171,12 @@ public class WNodeScreen extends Screen {
             }
         }
         if (button == 0) {
-            isSelecting = true; selStartX = nx; selStartY = ny; selEndX = nx; selEndY = ny;
-            if (!Screen.hasShiftDown()) graph.getNodes().forEach(n -> n.setSelected(false));
+            if (Screen.hasShiftDown()) {
+                isSelecting = true; selStartX = nx; selStartY = ny; selEndX = nx; selEndY = ny;
+            } else {
+                isPanning = true;
+                graph.getNodes().forEach(n -> n.setSelected(false));
+            }
             return true;
         }
         selectedNode = null; if (!Screen.hasShiftDown()) graph.getNodes().forEach(n -> n.setSelected(false));

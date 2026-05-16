@@ -3,8 +3,6 @@ package dev.propulsionteam.computed.content.blocks;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import dev.propulsionteam.computed.content.ComputedRegistries;
-import dev.propulsionteam.computed.content.PlacedPeripheralItemData;
-import dev.propulsionteam.computed.content.PeripheralConnectorItem;
 import dev.propulsionteam.computed.content.Peripherals;
 import dev.propulsionteam.computed.network.ComputedNetworking;
 import net.minecraft.nbt.CompoundTag;
@@ -17,15 +15,21 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.ItemInteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.EntityBlock;
+import net.minecraft.world.level.block.Mirror;
+import net.minecraft.world.level.block.Rotation;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityTicker;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.StateDefinition;
+import net.minecraft.world.level.block.state.properties.DirectionProperty;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.phys.BlockHitResult;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.Nullable;
@@ -36,13 +40,36 @@ public class ComputerBlock extends Block implements EntityBlock {
     public static final MapCodec<ComputerBlock> CODEC = RecordCodecBuilder.mapCodec(
             instance -> instance.group(propertiesCodec()).apply(instance, ComputerBlock::new));
 
+    public static final DirectionProperty FACING = BlockStateProperties.HORIZONTAL_FACING;
+
     public ComputerBlock(BlockBehaviour.Properties properties) {
         super(properties);
+        registerDefaultState(stateDefinition.any().setValue(FACING, Direction.NORTH));
     }
 
     @Override
     protected MapCodec<? extends Block> codec() {
         return CODEC;
+    }
+
+    @Override
+    protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
+        builder.add(FACING);
+    }
+
+    @Override
+    public BlockState getStateForPlacement(BlockPlaceContext context) {
+        return defaultBlockState().setValue(FACING, context.getHorizontalDirection().getOpposite());
+    }
+
+    @Override
+    protected BlockState rotate(BlockState state, Rotation rotation) {
+        return state.setValue(FACING, rotation.rotate(state.getValue(FACING)));
+    }
+
+    @Override
+    protected BlockState mirror(BlockState state, Mirror mirror) {
+        return state.rotate(mirror.getRotation(state.getValue(FACING)));
     }
 
     @Nullable
@@ -94,18 +121,6 @@ public class ComputerBlock extends Block implements EntityBlock {
                 case CONSUME -> ItemInteractionResult.CONSUME;
                 default -> ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
             };
-        }
-        if (!player.isSecondaryUseActive()) {
-            if (!stack.isEmpty()
-                    && !(stack.getItem() instanceof PeripheralConnectorItem)
-                    && Peripherals.isBindableHeldPeripheral(stack)) {
-                if (level.isClientSide) {
-                    return ItemInteractionResult.sidedSuccess(level.isClientSide);
-                }
-                if (PlacedPeripheralItemData.tryBindHeldItemToComputer(stack, level, pos, player)) {
-                    return ItemInteractionResult.CONSUME;
-                }
-            }
         }
         InteractionResult edit = openNodeEditor(level, pos, player);
         return switch (edit) {

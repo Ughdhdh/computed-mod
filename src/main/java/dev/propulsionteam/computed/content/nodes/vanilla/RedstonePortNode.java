@@ -1,9 +1,10 @@
 package dev.propulsionteam.computed.content.nodes.vanilla;
 
 import dev.devce.websnodelib.api.WNode;
-import dev.devce.websnodelib.api.elements.WButton;
+import dev.devce.websnodelib.api.elements.WDropdown;
 import dev.devce.websnodelib.api.elements.WLabel;
 import dev.propulsionteam.computed.Computed;
+import java.util.List;
 import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
 
@@ -16,31 +17,25 @@ public final class RedstonePortNode extends WNode {
             ResourceLocation.fromNamespaceAndPath(Computed.MODID, "redstone_emitter");
 
     private Direction emitFace = Direction.NORTH;
-    private final WLabel faceLabel;
+    private final WDropdown<Direction> faceDropdown;
 
     public RedstonePortNode(int x, int y) {
         super(TYPE_ID, "Redstone", x, y);
         addInput("Tick", 0xFF00FF88);
         addInput("Level", 0xFFFF6655);
-        faceLabel = new WLabel("", 0xFFCCCCCC);
-        addElement(faceLabel);
-        addElement(
-                new WButton("Cycle face", 88, () -> {
-                    Direction[] v = Direction.values();
-                    emitFace = v[(emitFace.ordinal() + 1) % v.length];
-                    refreshFaceLabel();
-                }));
+        faceDropdown = new WDropdown<>(
+                88,
+                List.of(Direction.values()),
+                d -> "Face: " + d.getName(),
+                emitFace,
+                d -> emitFace = d);
+        addElement(faceDropdown);
         addElement(new WLabel("Weak power 0-15 to neighbor", 0xFF888888));
         setEvaluator(n -> {});
-        refreshFaceLabel();
     }
 
     public Direction getEmitDirection() {
         return emitFace;
-    }
-
-    private void refreshFaceLabel() {
-        faceLabel.setText("Face: " + emitFace.name().toLowerCase());
     }
 
     @Override
@@ -57,8 +52,8 @@ public final class RedstonePortNode extends WNode {
             Direction parsed = Direction.byName(tag.getString("computedEmitFace"));
             if (parsed != null) {
                 emitFace = parsed;
+                faceDropdown.setSelected(parsed);
             }
         }
-        refreshFaceLabel();
     }
 }
