@@ -31,6 +31,7 @@ public final class InternalNodes {
     private static final ResourceLocation CAT_LOGIC = id("menu_logic");
     private static final ResourceLocation CAT_LOGIC_BINARY = id("menu_logic_binary");
     private static final ResourceLocation CAT_LOGIC_UNARY = id("menu_logic_unary");
+    private static final ResourceLocation CAT_LOGIC_COMPARISON = id("menu_logic_comparison");
 
     @FunctionalInterface
     private interface BinaryOp {
@@ -45,6 +46,11 @@ public final class InternalNodes {
     @FunctionalInterface
     private interface LogicBinaryOp {
         boolean apply(boolean a, boolean b);
+    }
+
+    @FunctionalInterface
+    private interface CompareOp {
+        boolean apply(double a, double b);
     }
 
     private InternalNodes() {}
@@ -83,6 +89,7 @@ public final class InternalNodes {
         NodeMenuRegistry.registerCategory(CAT_LOGIC, Component.literal("Logic"), NodeMenuRegistry.ROOT);
         NodeMenuRegistry.registerCategory(CAT_LOGIC_BINARY, Component.literal("Binary"), CAT_LOGIC);
         NodeMenuRegistry.registerCategory(CAT_LOGIC_UNARY, Component.literal("Unary"), CAT_LOGIC);
+        NodeMenuRegistry.registerCategory(CAT_LOGIC_COMPARISON, Component.literal("Comparison"), CAT_LOGIC);
     }
 
     private static void registerMathNodes() {
@@ -129,6 +136,48 @@ public final class InternalNodes {
             node.addElement(new WLabel("NOT"));
             node.setEvaluator(
                     n -> n.getOutputs().get(0).setValue(n.getInputs().get(0).getValue() > 0.5 ? 0.0 : 1.0));
+            return node;
+        });
+
+        registerCompare("cmp_eq", "=", "A = B", (a, b) -> a == b);
+        registerCompare("cmp_gt", ">", "A > B", (a, b) -> a > b);
+        registerCompare("cmp_lt", "<", "A < B", (a, b) -> a < b);
+        registerCompare("cmp_ge", ">=", "A >= B", (a, b) -> a >= b);
+        registerCompare("cmp_le", "<=", "A <= B", (a, b) -> a <= b);
+
+        ResourceLocation approxId = id("cmp_approx");
+        NodeRegistry.register(approxId, (x, y) -> {
+            WNode node = new WNode(approxId, "~=", x, y);
+            node.addInput("A", 0xFF00FF88);
+            node.addInput("B", 0xFF88CCFF);
+            node.addOutput("Out", 0xFFFF5555);
+            node.addElement(new WLabel("A ~= B"));
+            WSlider tolerance = new WSlider("Tolerance", 0.0, 15.0, 80);
+            tolerance.setValue(0.5);
+            node.addElement(tolerance);
+            node.setEvaluator(n -> {
+                double a = n.getInputs().get(0).getValue();
+                double b = n.getInputs().get(1).getValue();
+                double tol = tolerance.getValue();
+                n.getOutputs().get(0).setValue(Math.abs(a - b) <= tol ? 1.0 : 0.0);
+            });
+            return node;
+        });
+    }
+
+    private static void registerCompare(String path, String title, String label, CompareOp op) {
+        ResourceLocation nid = id(path);
+        NodeRegistry.register(nid, (x, y) -> {
+            WNode node = new WNode(nid, title, x, y);
+            node.addInput("A", 0xFF00FF88);
+            node.addInput("B", 0xFF88CCFF);
+            node.addOutput("Out", 0xFFFF5555);
+            node.addElement(new WLabel(label));
+            node.setEvaluator(n -> {
+                double a = n.getInputs().get(0).getValue();
+                double b = n.getInputs().get(1).getValue();
+                n.getOutputs().get(0).setValue(op.apply(a, b) ? 1.0 : 0.0);
+            });
             return node;
         });
     }
@@ -418,6 +467,13 @@ public final class InternalNodes {
         add(CAT_LOGIC_BINARY, "logic_nand", "NAND");
         add(CAT_LOGIC_BINARY, "logic_nor", "NOR");
         add(CAT_LOGIC_BINARY, "logic_xnor", "XNOR");
+
+        add(CAT_LOGIC_COMPARISON, "cmp_eq", "=");
+        add(CAT_LOGIC_COMPARISON, "cmp_gt", ">");
+        add(CAT_LOGIC_COMPARISON, "cmp_lt", "<");
+        add(CAT_LOGIC_COMPARISON, "cmp_ge", ">=");
+        add(CAT_LOGIC_COMPARISON, "cmp_le", "<=");
+        add(CAT_LOGIC_COMPARISON, "cmp_approx", "~=");
     }
 
     private static void add(ResourceLocation category, String nodePath, String label) {
