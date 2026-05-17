@@ -5,8 +5,11 @@ import dev.devce.websnodelib.api.NodeRegistry;
 import dev.propulsionteam.computed.Computed;
 import dev.propulsionteam.computed.content.nodes.create.CreateRedstoneLinkReceiverNode;
 import dev.propulsionteam.computed.content.nodes.create.CreateRedstoneLinkSenderNode;
+import dev.propulsionteam.computed.content.nodes.vanilla.BlockPresenceNode;
+import dev.propulsionteam.computed.content.nodes.vanilla.ComparatorReadNode;
 import dev.propulsionteam.computed.content.nodes.vanilla.RedstoneInputNode;
 import dev.propulsionteam.computed.content.nodes.vanilla.RedstonePortNode;
+import dev.propulsionteam.computed.content.nodes.vanilla.WorldTimeNode;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 
@@ -42,5 +45,17 @@ public final class ComputedNodes {
         NodeRegistry.register(RedstoneInputNode.TYPE_ID, RedstoneInputNode::new);
         NodeMenuRegistry.addNodeEntry(
                 MENU_VANILLA, RedstoneInputNode.TYPE_ID, Component.literal("Redstone Input"));
+
+        NodeRegistry.register(WorldTimeNode.TYPE_ID, WorldTimeNode::new);
+        NodeMenuRegistry.addNodeEntry(
+                MENU_VANILLA, WorldTimeNode.TYPE_ID, Component.literal("World Time"));
+
+        NodeRegistry.register(ComparatorReadNode.TYPE_ID, ComparatorReadNode::new);
+        NodeMenuRegistry.addNodeEntry(
+                MENU_VANILLA, ComparatorReadNode.TYPE_ID, Component.literal("Comparator Read"));
+
+        NodeRegistry.register(BlockPresenceNode.TYPE_ID, BlockPresenceNode::new);
+        NodeMenuRegistry.addNodeEntry(
+                MENU_VANILLA, BlockPresenceNode.TYPE_ID, Component.literal("Block Presence"));
     }
 }
