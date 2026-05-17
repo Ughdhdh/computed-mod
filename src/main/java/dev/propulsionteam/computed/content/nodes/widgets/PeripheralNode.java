@@ -1,0 +1,94 @@
+package dev.propulsionteam.computed.content.nodes.widgets;
+
+import dev.devce.websnodelib.api.WNode;
+import dev.devce.websnodelib.api.WPin;
+import dev.devce.websnodelib.api.elements.WDropdown;
+import dev.devce.websnodelib.api.elements.WLabel;
+import dev.propulsionteam.computed.content.blocks.ComputedGraphExecution;
+import dev.propulsionteam.computed.content.blocks.ComputerBlock;
+import dev.propulsionteam.computed.content.blocks.ComputerBlockEntity;
+import dev.propulsionteam.computed.content.monitors.MonitorBlockEntity;
+import dev.propulsionteam.computed.content.monitors.widgets.MonitorWidgetLayout;
+import dev.propulsionteam.computed.content.monitors.widgets.Widget;
+import dev.propulsionteam.computed.content.monitors.widgets.WidgetDrawList;
+import dev.propulsionteam.computed.content.nodes.vanilla.RelativeFace;
+import dev.propulsionteam.computed.network.ComputedNetworking;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.entity.BlockEntity;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Binds an adjacent monitor (selected by side relative to the computer) to this computer and pushes the
+ * widgets connected to its inputs as a draw list every graph tick.
+ */
+public final class PeripheralNode extends WNode {
+    public static final int WIDGET_INPUT_COUNT = 8;
+
+    private RelativeFace face = RelativeFace.FRONT;
+    private final WDropdown<RelativeFace> faceDropdown;
+
+    public PeripheralNode(int x, int y) {
+        super(WidgetNodeIds.PERIPHERAL, "Monitor Peripheral", x, y);
+        for (int i = 0; i < WIDGET_INPUT_COUNT; i++) {
+            addInput("W" + (i + 1), WPin.DataType.WIDGET, WPin.COLOR_WIDGET_DEFAULT);
+        }
+        faceDropdown = new WDropdown<>(
+                88,
+                List.of(RelativeFace.values()),
+                f -> "Face: " + f.displayName(),
+                face,
+                f -> face = f);
+        addElement(faceDropdown);
+        addElement(new WLabel("Binds to monitor on chosen side", 0xFF888888));
+        addElement(new WLabel("Screen px = monitor_blocks * 64", 0xFF888888));
+        setEvaluator(this::evaluateNode);
+    }
+
+    private void evaluateNode(WNode n) {
+        ComputerBlockEntity host = ComputedGraphExecution.hostOrNull();
+        if (host == null) return;
+        Level level = host.getLevel();
+        if (level == null || level.isClientSide) return;
+        Direction worldFace = face.toWorld(host.getBlockState().getValue(ComputerBlock.FACING));
+        BlockPos target = host.getBlockPos().relative(worldFace);
+        BlockEntity be = level.getBlockEntity(target);
+        if (!(be instanceof MonitorBlockEntity monitor)) return;
+        MonitorBlockEntity origin = monitor.findOrigin();
+        if (origin == null) return;
+
+        List<Widget> widgets = new ArrayList<>(n.getInputs().size());
+        for (var pin : n.getInputs()) {
+            Object v = pin.getWidgetValue();
+            if (v instanceof Widget w) widgets.add(w);
+        }
+        int screenW = origin.getWidth() * ComputedNetworking.SCREEN_PX_PER_BLOCK;
+        int screenH = origin.getHeight() * ComputedNetworking.SCREEN_PX_PER_BLOCK;
+        widgets = MonitorWidgetLayout.resolve(widgets, screenW, screenH);
+        origin.bindOwner(host.getBlockPos());
+        origin.setDrawList(new WidgetDrawList(widgets));
+    }
+
+    public RelativeFace getFace() { return face; }
+
+    @Override
+    public net.minecraft.nbt.CompoundTag save() {
+        net.minecraft.nbt.CompoundTag tag = super.save();
+        tag.putString("PeripheralFace", face.name());
+        return tag;
+    }
+
+    @Override
+    public void load(net.minecraft.nbt.CompoundTag tag) {
+        super.load(tag);
+        if (tag.contains("PeripheralFace")) {
+            try {
+                face = RelativeFace.valueOf(tag.getString("PeripheralFace"));
+                faceDropdown.setSelected(face);
+            } catch (IllegalArgumentException ignored) {}
+        }
+    }
+}

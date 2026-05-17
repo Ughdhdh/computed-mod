@@ -26,6 +26,22 @@ public class WNode {
     private Evaluator evaluator = (node) -> {};
     private int topoDepth = 0;
     private boolean selected = false;
+    /** Cached layout left-margin (input-label area + padding); recomputed in {@link #updateLayout()}. */
+    private int leftMargin = 5;
+    /** True when pins / elements / title changed since last {@link #updateLayout()}. */
+    private boolean layoutDirty = true;
+
+    /** Called by {@link WElement#markLayoutDirty()} when a child element's measured size changes. */
+    public void markLayoutDirty() {
+        this.layoutDirty = true;
+    }
+
+    private void ensureLayout() {
+        if (layoutDirty) {
+            updateLayout();
+            layoutDirty = false;
+        }
+    }
     /** Non-null only while {@link #evaluate()} runs as part of a {@link WGraph} step. */
     private transient WGraph evaluationGraph;
 
@@ -82,7 +98,8 @@ public class WNode {
      */
     public void addElement(WElement element) {
         this.elements.add(element);
-        updateLayout();
+        element.parent = this;
+        layoutDirty = true;
     }
 
     /**
@@ -93,7 +110,13 @@ public class WNode {
     public void addInput(String name, int color) {
         WPin pin = new WPin(name, WPin.Type.INPUT, color);
         this.inputs.add(pin);
-        updateLayout();
+        layoutDirty = true;
+    }
+
+    /** Typed input pin. */
+    public void addInput(String name, WPin.DataType dataType, int color) {
+        this.inputs.add(new WPin(name, WPin.Type.INPUT, dataType, color));
+        layoutDirty = true;
     }
 
     /**
@@ -104,7 +127,13 @@ public class WNode {
     public void addOutput(String name, int color) {
         WPin pin = new WPin(name, WPin.Type.OUTPUT, color);
         this.outputs.add(pin);
-        updateLayout();
+        layoutDirty = true;
+    }
+
+    /** Typed output pin. */
+    public void addOutput(String name, WPin.DataType dataType, int color) {
+        this.outputs.add(new WPin(name, WPin.Type.OUTPUT, dataType, color));
+        layoutDirty = true;
     }
 
     /**
@@ -130,7 +159,7 @@ public class WNode {
             maxOutputLabelWidth = Math.max(maxOutputLabelWidth, measureTextWidth(pin.getName()));
         }
 
-        int leftMargin = maxInputLabelWidth > 0 ? maxInputLabelWidth + 15 : 5;
+        this.leftMargin = maxInputLabelWidth > 0 ? maxInputLabelWidth + 15 : 5;
         int rightMargin = maxOutputLabelWidth > 0 ? maxOutputLabelWidth + 15 : 5;
 
         int bodyWidth = 80;
@@ -141,7 +170,7 @@ public class WNode {
         }
 
         int titleWidth = measureTextWidth(title) + 20;
-        this.width = Math.max(titleWidth, leftMargin + bodyWidth + rightMargin);
+        this.width = Math.max(titleWidth, this.leftMargin + bodyWidth + rightMargin);
         
         int pinAreaHeight = Math.max(inputs.size(), outputs.size()) * 12;
         this.height = headerHeight + Math.max(bodyHeight, pinAreaHeight) + 5;
@@ -155,7 +184,7 @@ public class WNode {
      * @param partialTick Animation frame fraction.
      */
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        updateLayout();
+        ensureLayout();
         boolean isHovered = mouseX >= x && mouseX <= x + width && mouseY >= y && mouseY <= y + height;
 
         // Shadow/Glow
@@ -174,16 +203,10 @@ public class WNode {
         
         graphics.drawString(net.minecraft.client.Minecraft.getInstance().font, title, x + 5, y + 3, 0xFF00FF88, false);
 
-        int maxInputLabelWidth = 0;
-        for (WPin pin : inputs) {
-            maxInputLabelWidth = Math.max(maxInputLabelWidth, measureTextWidth(pin.getName()));
-        }
-        int leftMargin = maxInputLabelWidth > 0 ? maxInputLabelWidth + 15 : 5;
-
         // Render elements
         int currentY = y + 20;
         for (WElement element : elements) {
-            element.render(graphics, x + leftMargin, currentY, mouseX, mouseY, partialTick);
+            element.render(graphics, x + this.leftMargin, currentY, mouseX, mouseY, partialTick);
             currentY += element.getHeight();
         }
 
@@ -240,16 +263,11 @@ public class WNode {
      * Forwards mouse click events to internal UI elements.
      */
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        int maxInputLabelWidth = 0;
-        for (WPin pin : inputs) {
-            maxInputLabelWidth = Math.max(maxInputLabelWidth, measureTextWidth(pin.getName()));
-        }
-        int leftMargin = maxInputLabelWidth > 0 ? maxInputLabelWidth + 15 : 5;
-
+        ensureLayout();
         boolean handled = false;
         int currentY = 20;
         for (WElement element : new ArrayList<>(elements)) {
-            if (element.handleMouseClick(mouseX - leftMargin, mouseY - currentY, button)) {
+            if (element.handleMouseClick(mouseX - this.leftMargin, mouseY - currentY, button)) {
                 handled = true;
             }
             currentY += element.getHeight();
@@ -261,15 +279,10 @@ public class WNode {
      * Forwards mouse release events to internal UI elements.
      */
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
-        int maxInputLabelWidth = 0;
-        for (WPin pin : inputs) {
-            maxInputLabelWidth = Math.max(maxInputLabelWidth, measureTextWidth(pin.getName()));
-        }
-        int leftMargin = maxInputLabelWidth > 0 ? maxInputLabelWidth + 15 : 5;
-
+        ensureLayout();
         int currentY = 20;
         for (WElement element : new ArrayList<>(elements)) {
-            element.handleMouseRelease(mouseX - leftMargin, mouseY - currentY, button);
+            element.handleMouseRelease(mouseX - this.leftMargin, mouseY - currentY, button);
             currentY += element.getHeight();
         }
         return false;
@@ -349,6 +362,7 @@ public class WNode {
         
         net.minecraft.nbt.ListTag elementsTag = tag.getList("elements", 10);
         for (int i = 0; i < Math.min(elements.size(), elementsTag.size()); i++) elements.get(i).load(elementsTag.getCompound(i));
+        layoutDirty = true;
     }
 
     public void setSelected(boolean selected) { this.selected = selected; }
@@ -365,7 +379,7 @@ public class WNode {
 
     public void setTitle(String title) {
         this.title = title != null ? title : "";
-        updateLayout();
+        layoutDirty = true;
     }
 
     /** When true, editor actions cannot remove this node (selection delete, section bulk delete, etc.). */

@@ -10,6 +10,15 @@ import dev.propulsionteam.computed.content.nodes.vanilla.ComparatorReadNode;
 import dev.propulsionteam.computed.content.nodes.vanilla.RedstoneInputNode;
 import dev.propulsionteam.computed.content.nodes.vanilla.RedstonePortNode;
 import dev.propulsionteam.computed.content.nodes.vanilla.WorldTimeNode;
+import dev.propulsionteam.computed.content.nodes.widgets.ButtonWidgetNode;
+import dev.propulsionteam.computed.content.nodes.widgets.ClockWidgetNode;
+import dev.propulsionteam.computed.content.nodes.widgets.ColorSourceNode;
+import dev.propulsionteam.computed.content.nodes.widgets.PeripheralNode;
+import dev.propulsionteam.computed.content.nodes.widgets.ProgressBarWidgetNode;
+import dev.propulsionteam.computed.content.nodes.widgets.SliderWidgetNode;
+import dev.propulsionteam.computed.content.nodes.widgets.TextSourceNode;
+import dev.propulsionteam.computed.content.nodes.widgets.TextWidgetNode;
+import dev.propulsionteam.computed.content.nodes.widgets.WidgetNodeIds;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 
@@ -20,6 +29,10 @@ public final class ComputedNodes {
             ResourceLocation.fromNamespaceAndPath(Computed.MODID, "menu_create");
     private static final ResourceLocation MENU_CREATE_REDSTONE_LINK =
             ResourceLocation.fromNamespaceAndPath(Computed.MODID, "menu_create_redstone_link");
+    private static final ResourceLocation MENU_SOURCES =
+            ResourceLocation.fromNamespaceAndPath("websnodelib", "menu_sources");
+    private static final ResourceLocation MENU_WIDGETS =
+            ResourceLocation.fromNamespaceAndPath(Computed.MODID, "menu_widgets");
 
     private ComputedNodes() {}
 
@@ -57,5 +70,31 @@ public final class ComputedNodes {
         NodeRegistry.register(BlockPresenceNode.TYPE_ID, BlockPresenceNode::new);
         NodeMenuRegistry.addNodeEntry(
                 MENU_VANILLA, BlockPresenceNode.TYPE_ID, Component.literal("Block Presence"));
+
+        NodeMenuRegistry.registerCategory(MENU_WIDGETS, Component.literal("Widgets"), NodeMenuRegistry.ROOT);
+
+        NodeRegistry.register(WidgetNodeIds.TEXT_SOURCE, TextSourceNode::new);
+        NodeMenuRegistry.addNodeEntry(MENU_SOURCES, WidgetNodeIds.TEXT_SOURCE, Component.literal("Text"));
+
+        NodeRegistry.register(WidgetNodeIds.COLOR_SOURCE, ColorSourceNode::new);
+        NodeMenuRegistry.addNodeEntry(MENU_SOURCES, WidgetNodeIds.COLOR_SOURCE, Component.literal("Color"));
+
+        NodeRegistry.register(WidgetNodeIds.PERIPHERAL, PeripheralNode::new);
+        NodeMenuRegistry.addNodeEntry(MENU_WIDGETS, WidgetNodeIds.PERIPHERAL, Component.literal("Monitor Peripheral"));
+
+        NodeRegistry.register(WidgetNodeIds.TEXT_WIDGET, TextWidgetNode::new);
+        NodeMenuRegistry.addNodeEntry(MENU_WIDGETS, WidgetNodeIds.TEXT_WIDGET, Component.literal("Text Widget"));
+
+        NodeRegistry.register(WidgetNodeIds.CLOCK_WIDGET, ClockWidgetNode::new);
+        NodeMenuRegistry.addNodeEntry(MENU_WIDGETS, WidgetNodeIds.CLOCK_WIDGET, Component.literal("Clock Widget"));
+
+        NodeRegistry.register(WidgetNodeIds.BUTTON_WIDGET, ButtonWidgetNode::new);
+        NodeMenuRegistry.addNodeEntry(MENU_WIDGETS, WidgetNodeIds.BUTTON_WIDGET, Component.literal("Button Widget"));
+
+        NodeRegistry.register(WidgetNodeIds.SLIDER_WIDGET, SliderWidgetNode::new);
+        NodeMenuRegistry.addNodeEntry(MENU_WIDGETS, WidgetNodeIds.SLIDER_WIDGET, Component.literal("Slider Widget"));
+
+        NodeRegistry.register(WidgetNodeIds.PROGRESS_BAR_WIDGET, ProgressBarWidgetNode::new);
+        NodeMenuRegistry.addNodeEntry(MENU_WIDGETS, WidgetNodeIds.PROGRESS_BAR_WIDGET, Component.literal("Progress Bar Widget"));
     }
 }

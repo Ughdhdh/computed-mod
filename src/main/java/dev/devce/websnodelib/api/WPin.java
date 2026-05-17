@@ -4,78 +4,86 @@ import net.minecraft.client.gui.GuiGraphics;
 
 /**
  * Represents a connection point on a node.
- * Pins can be of type INPUT or OUTPUT and carry a numeric (double) value.
+ * Pins can be of type INPUT or OUTPUT and carry a typed value (number, string, or widget).
  */
 public class WPin extends WElement {
-    /**
-     * Defines the direction of data flow for the pin.
-     */
+    /** Direction of data flow. */
     public enum Type { INPUT, OUTPUT }
+
+    /**
+     * The kind of value carried over the pin. Connections are only allowed between matching data types.
+     */
+    public enum DataType { NUMBER, STRING, WIDGET }
+
+    /** Default editor accent for each data type when callers don't specify one. */
+    public static final int COLOR_NUMBER_DEFAULT = 0xFFFFFFFF;
+    public static final int COLOR_STRING_DEFAULT = 0xFFFFC830;
+    public static final int COLOR_WIDGET_DEFAULT = 0xFF40D0FF;
 
     private String name;
     private final Type type;
+    private final DataType dataType;
     private final int color;
     private boolean connected;
     private double value;
+    private String stringValue = "";
+    private Object widgetValue;
 
     /**
-     * Creates a new pin.
-     * @param name Display name of the pin.
-     * @param type INPUT or OUTPUT.
-     * @param color The accent color for the pin's icon.
+     * Creates a NUMBER pin (back-compat constructor used by existing nodes).
      */
     public WPin(String name, Type type, int color) {
+        this(name, type, DataType.NUMBER, color);
+    }
+
+    public WPin(String name, Type type, DataType dataType, int color) {
         this.name = name;
         this.type = type;
+        this.dataType = dataType;
         this.color = color;
     }
 
-    /**
-     * Note: Pin rendering is currently managed by the parent WNode to ensure 
-     * correct alignment with the node body and headers.
-     */
     @Override
     public void render(GuiGraphics graphics, int x, int y, int mouseX, int mouseY, float partialTick) {
-        // Rendering handled by WNode
+        // Pin rendering is owned by WNode for layout alignment.
     }
 
     public String getName() { return name; }
-
-    public void setName(String name) {
-        this.name = name != null ? name : "";
-    }
+    public void setName(String name) { this.name = name != null ? name : ""; }
     public Type getType() { return type; }
+    public DataType getDataType() { return dataType; }
     public int getColor() { return color; }
-
-    /**
-     * @return True if this pin is part of an active WConnection.
-     */
     public boolean isConnected() { return connected; }
-
-    /**
-     * Updates the connection status of this pin.
-     */
     public void setConnected(boolean connected) { this.connected = connected; }
 
     public net.minecraft.nbt.CompoundTag save() {
         net.minecraft.nbt.CompoundTag tag = new net.minecraft.nbt.CompoundTag();
-        tag.putDouble("value", value);
+        switch (dataType) {
+            case NUMBER -> tag.putDouble("value", value);
+            case STRING -> tag.putString("s", stringValue == null ? "" : stringValue);
+            case WIDGET -> {
+                // Widget values are recomputed every tick from connected widget nodes — nothing to persist.
+            }
+        }
         return tag;
     }
 
     public void load(net.minecraft.nbt.CompoundTag tag) {
-        this.value = tag.getDouble("value");
+        switch (dataType) {
+            case NUMBER -> this.value = tag.getDouble("value");
+            case STRING -> this.stringValue = tag.contains("s") ? tag.getString("s") : "";
+            case WIDGET -> {
+                // see save()
+            }
+        }
     }
 
-    /**
-     * @return The current numeric value stored in this pin.
-     */
     public double getValue() { return value; }
-
-    /**
-     * Sets the numeric value for this pin.
-     * For INPUT pins, this is usually set by a WConnection.
-     * For OUTPUT pins, this is set by the node's Evaluator.
-     */
     public void setValue(double value) { this.value = value; }
+
+    public String getStringValue() { return stringValue == null ? "" : stringValue; }
+    public void setStringValue(String s) { this.stringValue = s == null ? "" : s; }
+
+    public Object getWidgetValue() { return widgetValue; }
+    public void setWidgetValue(Object o) { this.widgetValue = o; }
 }

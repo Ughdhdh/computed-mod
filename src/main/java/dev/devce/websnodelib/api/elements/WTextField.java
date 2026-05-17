@@ -5,6 +5,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.sounds.SoundEvents;
+import net.neoforged.fml.loading.FMLEnvironment;
 import org.lwjgl.glfw.GLFW;
 
 public class WTextField extends WElement {
@@ -12,8 +13,12 @@ public class WTextField extends WElement {
     private boolean focused = false;
     private int cursorPos = 0;
     private int selectionPos = 0;
+    private final int minWidth;
+    /** Last {@code value} string we measured against the font. Reference compare keeps {@link #render} hot-path allocation-free. */
+    private String measuredValue = null;
 
     public WTextField(int width) {
+        this.minWidth = width;
         this.width = width;
         this.height = 12;
     }
@@ -106,6 +111,7 @@ public class WTextField extends WElement {
                 value = value.substring(0, start) + value.substring(cursorPos);
                 cursorPos = start;
                 selectionPos = cursorPos;
+                updateWidthForValue();
             }
             playTypingSound(0.9f);
             return true;
@@ -116,6 +122,7 @@ public class WTextField extends WElement {
             } else if (cursorPos < value.length()) {
                 int end = ctrl ? nextWordBoundary(cursorPos) : cursorPos + 1;
                 value = value.substring(0, cursorPos) + value.substring(end);
+                updateWidthForValue();
             }
             playTypingSound(0.9f);
             return true;
@@ -164,6 +171,12 @@ public class WTextField extends WElement {
         this.value = value == null ? "" : value;
         cursorPos = this.value.length();
         selectionPos = cursorPos;
+        updateWidthForValue();
+    }
+
+    @Override
+    public int getWidth() {
+        return super.getWidth();
     }
     @Override
     public net.minecraft.nbt.CompoundTag save() {
@@ -177,6 +190,7 @@ public class WTextField extends WElement {
         this.value = tag.getString("value");
         cursorPos = this.value.length();
         selectionPos = cursorPos;
+        updateWidthForValue();
     }
 
     @Override
@@ -225,6 +239,7 @@ public class WTextField extends WElement {
         value = value.substring(0, start) + value.substring(end);
         cursorPos = start;
         selectionPos = start;
+        updateWidthForValue();
     }
 
     private void replaceSelection(String text) {
@@ -232,6 +247,26 @@ public class WTextField extends WElement {
         value = value.substring(0, cursorPos) + text + value.substring(cursorPos);
         cursorPos += text.length();
         selectionPos = cursorPos;
+        updateWidthForValue();
+    }
+
+    private void updateWidthForValue() {
+        if (value == measuredValue || (measuredValue != null && measuredValue.equals(value))) {
+            return;
+        }
+        measuredValue = value;
+        int textWidth;
+        if (FMLEnvironment.dist.isDedicatedServer()) {
+            textWidth = value.length() * 6;
+        } else {
+            Minecraft mc = Minecraft.getInstance();
+            textWidth = mc == null ? value.length() * 6 : mc.font.width(value);
+        }
+        int newWidth = Math.max(minWidth, textWidth + 8);
+        if (newWidth != width) {
+            width = newWidth;
+            markLayoutDirty();
+        }
     }
 
     private void copySelection() {

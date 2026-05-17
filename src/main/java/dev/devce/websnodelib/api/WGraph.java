@@ -29,6 +29,13 @@ public class WGraph {
     private final List<WNode> nodes = new ArrayList<>();
     private final List<WConnection> connections = new ArrayList<>();
     private final List<WSection> sections = new ArrayList<>();
+    /** UUID→node lookup; kept in sync with {@link #nodes} to avoid O(n) stream scans in hot render paths. */
+    private final Map<UUID, WNode> nodeIndex = new HashMap<>();
+
+    /** O(1) node lookup by id. Returns null if not present. */
+    public WNode getNode(UUID id) {
+        return id == null ? null : nodeIndex.get(id);
+    }
 
     /** Grouping rectangle shown in the editor. */
     public static class WSection {
@@ -147,6 +154,7 @@ public class WGraph {
      */
     public void addNode(WNode node) {
         nodes.add(node);
+        nodeIndex.put(node.getId(), node);
         dedupeFunctionBoundaryNodes();
         pruneDanglingConnections();
         updateTopology();
@@ -158,6 +166,7 @@ public class WGraph {
      */
     public void removeNode(WNode node) {
         nodes.remove(node);
+        nodeIndex.remove(node.getId());
         connections.removeIf(c -> c.sourceNode().equals(node.getId()) || c.targetNode().equals(node.getId()));
         updateTopology();
     }
@@ -209,6 +218,7 @@ public class WGraph {
      */
     public void load(net.minecraft.nbt.CompoundTag tag) {
         nodes.clear();
+        nodeIndex.clear();
         connections.clear();
         sections.clear();
         
@@ -220,6 +230,7 @@ public class WGraph {
             if (node != null) {
                 node.load(nTag);
                 nodes.add(node);
+                nodeIndex.put(node.getId(), node);
             }
         }
         
@@ -284,6 +295,7 @@ public class WGraph {
         Set<UUID> extraIds = new HashSet<>();
         for (WNode n : extras) {
             extraIds.add(n.getId());
+            nodeIndex.remove(n.getId());
         }
         connections.removeIf(
                 c -> extraIds.contains(c.sourceNode()) || extraIds.contains(c.targetNode()));
@@ -526,10 +538,18 @@ public class WGraph {
                     || tp >= target.getInputs().size()) {
                 continue;
             }
-            double val = source.getOutputs().get(sp).getValue();
-            target.getInputs().get(tp).setValue(val);
-            target.getInputs().get(tp).setConnected(true);
-            source.getOutputs().get(sp).setConnected(true);
+            WPin srcPin = source.getOutputs().get(sp);
+            WPin tgtPin = target.getInputs().get(tp);
+            if (srcPin.getDataType() != tgtPin.getDataType()) {
+                continue;
+            }
+            switch (srcPin.getDataType()) {
+                case NUMBER -> tgtPin.setValue(srcPin.getValue());
+                case STRING -> tgtPin.setStringValue(srcPin.getStringValue());
+                case WIDGET -> tgtPin.setWidgetValue(srcPin.getWidgetValue());
+            }
+            tgtPin.setConnected(true);
+            srcPin.setConnected(true);
         }
     }
 

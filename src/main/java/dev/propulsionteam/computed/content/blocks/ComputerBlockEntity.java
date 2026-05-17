@@ -4,6 +4,7 @@ import dev.devce.websnodelib.api.FunctionCardNode;
 import dev.devce.websnodelib.api.FunctionDefinitionStore;
 import dev.devce.websnodelib.api.WGraph;
 import dev.devce.websnodelib.api.WNode;
+import dev.devce.websnodelib.api.WPin;
 import dev.propulsionteam.computed.content.ComputedRegistries;
 import dev.propulsionteam.computed.content.Peripherals;
 import dev.propulsionteam.computed.content.blocks.ComputedGraphExecution;
@@ -26,7 +27,6 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BaseContainerBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.Nullable;
@@ -190,8 +190,8 @@ public class ComputerBlockEntity extends BaseContainerBlockEntity {
     public void applyGraphFromNetwork(CompoundTag tag) {
         CompoundTag copy = tag.copy();
         Peripherals.stripEditorOnlyTags(copy);
-        java.util.Map<UUID, double[]> inputSnap = new java.util.HashMap<>();
-        java.util.Map<UUID, double[]> outputSnap = new java.util.HashMap<>();
+        java.util.Map<UUID, PinSnapshot[]> inputSnap = new java.util.HashMap<>();
+        java.util.Map<UUID, PinSnapshot[]> outputSnap = new java.util.HashMap<>();
         snapshotPinValues(graph, inputSnap, outputSnap);
         if (copy.contains("ComputerGraph", Tag.TAG_COMPOUND)) {
             graph.load(copy.getCompound("ComputerGraph"));
@@ -206,19 +206,16 @@ public class ComputerBlockEntity extends BaseContainerBlockEntity {
         FunctionCardNode.applyLibraryToInnerGraphs(graph, functionDefinitions);
         restorePinValues(graph, inputSnap, outputSnap);
         setChanged();
-        if (level != null) {
-            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_ALL);
-        }
     }
 
     private static void snapshotPinValues(WGraph g,
-                                          java.util.Map<UUID, double[]> ins,
-                                          java.util.Map<UUID, double[]> outs) {
+                                          java.util.Map<UUID, PinSnapshot[]> ins,
+                                          java.util.Map<UUID, PinSnapshot[]> outs) {
         for (WNode n : g.getNodes()) {
-            double[] in = new double[n.getInputs().size()];
-            for (int i = 0; i < in.length; i++) in[i] = n.getInputs().get(i).getValue();
-            double[] out = new double[n.getOutputs().size()];
-            for (int i = 0; i < out.length; i++) out[i] = n.getOutputs().get(i).getValue();
+            PinSnapshot[] in = new PinSnapshot[n.getInputs().size()];
+            for (int i = 0; i < in.length; i++) in[i] = PinSnapshot.capture(n.getInputs().get(i));
+            PinSnapshot[] out = new PinSnapshot[n.getOutputs().size()];
+            for (int i = 0; i < out.length; i++) out[i] = PinSnapshot.capture(n.getOutputs().get(i));
             ins.put(n.getId(), in);
             outs.put(n.getId(), out);
             if (n instanceof FunctionCardNode fc) {
@@ -228,23 +225,40 @@ public class ComputerBlockEntity extends BaseContainerBlockEntity {
     }
 
     private static void restorePinValues(WGraph g,
-                                         java.util.Map<UUID, double[]> ins,
-                                         java.util.Map<UUID, double[]> outs) {
+                                         java.util.Map<UUID, PinSnapshot[]> ins,
+                                         java.util.Map<UUID, PinSnapshot[]> outs) {
         for (WNode n : g.getNodes()) {
-            double[] in = ins.get(n.getId());
+            PinSnapshot[] in = ins.get(n.getId());
             if (in != null) {
                 for (int i = 0; i < Math.min(in.length, n.getInputs().size()); i++) {
-                    n.getInputs().get(i).setValue(in[i]);
+                    in[i].restoreTo(n.getInputs().get(i));
                 }
             }
-            double[] out = outs.get(n.getId());
+            PinSnapshot[] out = outs.get(n.getId());
             if (out != null) {
                 for (int i = 0; i < Math.min(out.length, n.getOutputs().size()); i++) {
-                    n.getOutputs().get(i).setValue(out[i]);
+                    out[i].restoreTo(n.getOutputs().get(i));
                 }
             }
             if (n instanceof FunctionCardNode fc) {
                 restorePinValues(fc.getInnerGraph(), ins, outs);
+            }
+        }
+    }
+
+    private record PinSnapshot(WPin.DataType type, double numberValue, String stringValue, Object widgetValue) {
+        static PinSnapshot capture(WPin pin) {
+            return new PinSnapshot(pin.getDataType(), pin.getValue(), pin.getStringValue(), pin.getWidgetValue());
+        }
+
+        void restoreTo(WPin pin) {
+            if (pin.getDataType() != type) {
+                return;
+            }
+            switch (type) {
+                case NUMBER -> pin.setValue(numberValue);
+                case STRING -> pin.setStringValue(stringValue);
+                case WIDGET -> pin.setWidgetValue(widgetValue);
             }
         }
     }

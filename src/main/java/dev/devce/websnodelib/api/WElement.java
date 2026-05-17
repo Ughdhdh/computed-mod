@@ -12,6 +12,13 @@ public abstract class WElement {
     protected int height;
     protected int padding = 2;
     protected int margin = 2;
+    /** Set by {@link WNode#addElement(WElement)} so resizing elements can flip the parent's layout-dirty flag. */
+    WNode parent;
+
+    /** Call when this element's measured width/height changes so the parent re-runs layout next frame. */
+    protected final void markLayoutDirty() {
+        if (parent != null) parent.markLayoutDirty();
+    }
 
     /**
      * Renders the element at the specified logical coordinates.

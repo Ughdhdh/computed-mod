@@ -303,6 +303,9 @@ public class WNodeScreen extends Screen {
     private boolean editorFirstInit = true;
     /** Wall-clock scroll for wire pulses; smooth at any tick rate (not tied to {@link WGraph#getSimulationStepCounter()}). */
     private float wirePulseScroll;
+    /** Reusable scratch buffers for {@link #drawConnection} to avoid per-frame {@code int[]} allocation per wire. */
+    private int[] wireChainXs = new int[4];
+    private int[] wireChainYs = new int[4];
     
     /**
      * Particle system for the background.
@@ -1762,6 +1765,13 @@ public class WNodeScreen extends Screen {
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        // drawManaged disables GuiGraphics's per-fill `bufferSource.endBatch()`, so the hundreds
+        // of fills/quads/strings emitted below batch into one OpenGL submission per render type
+        // instead of one submission per call. This is the dominant FPS win on busy editor screens.
+        graphics.drawManaged(() -> renderInner(graphics, mouseX, mouseY, partialTick));
+    }
+
+    private void renderInner(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         long now = net.minecraft.Util.getMillis();
         float deltaTime = (lastFrameTime == 0) ? 0.016f : (now - lastFrameTime) / 1000f;
         lastFrameTime = now;
@@ -1856,6 +1866,7 @@ public class WNodeScreen extends Screen {
             updateWireInteractionHover(gmx, gmy);
         } else {
             clearWireHover();
+            invalidateHoverCache();
         }
         int wi = 0;
         for (WConnection conn : graph.getConnections()) {
@@ -3517,6 +3528,12 @@ public class WNodeScreen extends Screen {
         wireHoverConnIdx = -1;
     }
 
+    /** Invalidate the {@link #updateWireInteractionHover} cache; call when the panel is left so re-entry recomputes. */
+    private void invalidateHoverCache() {
+        hoverCacheGx = Integer.MIN_VALUE;
+        hoverCacheGy = Integer.MIN_VALUE;
+    }
+
     private static int wireArgbForConnection(WConnection c) {
         int h = Objects.hash(c.sourceNode(), c.sourcePin(), c.targetNode(), c.targetPin());
         return WIRE_ARGB_PALETTE[Math.floorMod(h, WIRE_ARGB_PALETTE.length)];
@@ -3570,7 +3587,29 @@ public class WNodeScreen extends Screen {
         return Math.max(5, Mth.ceil(9f / scale));
     }
 
+    /** Throttle state for {@link #updateWireInteractionHover}: when mouse and topology are stable, skip the 24-sample-per-segment scan. */
+    private int hoverCacheGx = Integer.MIN_VALUE;
+    private int hoverCacheGy = Integer.MIN_VALUE;
+    private int hoverCacheConnCount = -1;
+    private int hoverCacheNodeCount = -1;
+    private float hoverCacheScale = Float.NaN;
+
     private void updateWireInteractionHover(int gx, int gy) {
+        int connCount = graph.getConnections().size();
+        int nodeCount = graph.getNodes().size();
+        float scaleNow = editorContentScale();
+        if (gx == hoverCacheGx
+                && gy == hoverCacheGy
+                && connCount == hoverCacheConnCount
+                && nodeCount == hoverCacheNodeCount
+                && scaleNow == hoverCacheScale) {
+            return;
+        }
+        hoverCacheGx = gx;
+        hoverCacheGy = gy;
+        hoverCacheConnCount = connCount;
+        hoverCacheNodeCount = nodeCount;
+        hoverCacheScale = scaleNow;
         clearWireHover();
         if (graphPointBlocksWireInteraction(gx, gy)) {
             return;
@@ -3729,8 +3768,12 @@ public class WNodeScreen extends Screen {
             return;
         }
         int n = wireChainLen(conn);
-        int[] xs = new int[n];
-        int[] ys = new int[n];
+        if (wireChainXs.length < n) {
+            wireChainXs = new int[n];
+            wireChainYs = new int[n];
+        }
+        int[] xs = wireChainXs;
+        int[] ys = wireChainYs;
         fillWireChainEndpoints(conn, src, tgt, xs, ys);
         int color = wireArgbForConnection(conn);
         for (int seg = 0; seg < n - 1; seg++) {
@@ -3738,7 +3781,7 @@ public class WNodeScreen extends Screen {
         }
         graphics.pose().pushPose();
         graphics.pose().translate(0, 0, 500);
-        drawConnectionPulseTravelChain(graphics, xs, ys, src.getTopoDepth(), color);
+        drawConnectionPulseTravelChain(graphics, xs, ys, n, src.getTopoDepth(), color);
         graphics.pose().popPose();
         int rgb = color & 0xFFFFFF;
         int wh = Math.max(3, Mth.ceil(4f / editorContentScale()));
@@ -3772,8 +3815,8 @@ public class WNodeScreen extends Screen {
     private static final float PULSE_DOT_SPACING = 0.11f;
 
     private void drawConnectionPulseTravelChain(
-            GuiGraphics graphics, int[] xs, int[] ys, int topoDepth, int wireArgb) {
-        int segCount = xs.length - 1;
+            GuiGraphics graphics, int[] xs, int[] ys, int pointCount, int topoDepth, int wireArgb) {
+        int segCount = pointCount - 1;
         if (segCount <= 0) {
             return;
         }
@@ -3850,7 +3893,7 @@ public class WNodeScreen extends Screen {
     }
 
     private WNode findNode(UUID id) {
-        return graph.getNodes().stream().filter(n -> n.getId().equals(id)).findFirst().orElse(null);
+        return graph.getNode(id);
     }
 
     @Override
@@ -4208,6 +4251,12 @@ public class WNodeScreen extends Screen {
                 if (inPin != -1) {
                     if (isEditorPeripheralLocked(linkingNode.getTypeId())
                             || isEditorPeripheralLocked(node.getTypeId())) {
+                        playUiClick(0.82f);
+                        continue;
+                    }
+                    dev.devce.websnodelib.api.WPin srcPin = linkingNode.getOutputs().get(linkingPin);
+                    dev.devce.websnodelib.api.WPin tgtPin = node.getInputs().get(inPin);
+                    if (srcPin.getDataType() != tgtPin.getDataType()) {
                         playUiClick(0.82f);
                         continue;
                     }

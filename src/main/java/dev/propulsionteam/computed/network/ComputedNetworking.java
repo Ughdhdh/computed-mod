@@ -1,7 +1,14 @@
 package dev.propulsionteam.computed.network;
 
+import dev.devce.websnodelib.api.FunctionCardNode;
+import dev.devce.websnodelib.api.WGraph;
+import dev.devce.websnodelib.api.WNode;
 import dev.propulsionteam.computed.ComputerEditorBridge;
 import dev.propulsionteam.computed.content.blocks.ComputerBlockEntity;
+import dev.propulsionteam.computed.content.monitors.MonitorBlockEntity;
+import dev.propulsionteam.computed.content.monitors.widgets.SliderWidget;
+import dev.propulsionteam.computed.content.monitors.widgets.Widget;
+import dev.propulsionteam.computed.content.nodes.widgets.InteractiveWidgetNode;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerPlayer;
@@ -12,8 +19,19 @@ import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 
+import java.util.UUID;
+
 public final class ComputedNetworking {
     private static final double MAX_EDIT_DISTANCE_SQ = 8.0 * 8.0;
+    /** Pixels per monitor block; widget x/y/w/h are in this coordinate system. */
+    public static final int SCREEN_PX_PER_BLOCK = 64;
+    /** Monitor model/texture pixels reserved by the bezel on each outer screen edge. */
+    public static final int BEZEL_MODEL_PIXELS = 2;
+    /** Minecraft model pixels per full block edge. */
+    public static final int MODEL_PIXELS_PER_BLOCK = 16;
+    /** Bezel inset in widget coordinate pixels for one outer edge. */
+    public static final int SCREEN_BEZEL_PX =
+            SCREEN_PX_PER_BLOCK * BEZEL_MODEL_PIXELS / MODEL_PIXELS_PER_BLOCK;
 
     private ComputedNetworking() {}
 
@@ -31,6 +49,10 @@ public final class ComputedNetworking {
                 SaveComputerGraphPayload.TYPE,
                 SaveComputerGraphPayload.STREAM_CODEC,
                 ComputedNetworking::handleSaveGraph);
+        registrar.playToServer(
+                MonitorClickPayload.TYPE,
+                MonitorClickPayload.STREAM_CODEC,
+                ComputedNetworking::handleMonitorClick);
     }
 
     public static OpenComputerEditorPayload openPayload(BlockPos pos, CompoundTag graphTag) {
@@ -55,5 +77,47 @@ public final class ComputedNetworking {
                 computer.applyGraphFromNetwork(payload.graphTag());
             }
         });
+    }
+
+    private static void handleMonitorClick(MonitorClickPayload payload, IPayloadContext ctx) {
+        ctx.enqueueWork(() -> {
+            if (!(ctx.player() instanceof ServerPlayer player)) return;
+            BlockPos originPos = payload.originPos();
+            if (player.distanceToSqr(Vec3.atCenterOf(originPos)) > MAX_EDIT_DISTANCE_SQ) return;
+            BlockEntity be = player.level().getBlockEntity(originPos);
+            if (!(be instanceof MonitorBlockEntity origin)) return;
+            BlockPos ownerPos = origin.getOwnerComputerPos();
+            if (ownerPos == null) return;
+            BlockEntity ownerBe = player.level().getBlockEntity(ownerPos);
+            if (!(ownerBe instanceof ComputerBlockEntity computer)) return;
+
+            int screenW = origin.getWidth() * SCREEN_PX_PER_BLOCK;
+            int screenH = origin.getHeight() * SCREEN_PX_PER_BLOCK;
+            int px = Math.min(screenW - 1, Math.max(0, (int) Math.floor(payload.u() * screenW)));
+            int py = Math.min(screenH - 1, Math.max(0, (int) Math.floor(payload.v() * screenH)));
+
+            for (Widget w : origin.getDrawList().widgets()) {
+                if (px < w.x() || px >= w.x() + w.w() || py < w.y() || py >= w.y() + w.h()) continue;
+                WNode node = findNodeById(computer.getGraph(), w.id());
+                if (!(node instanceof InteractiveWidgetNode interactive)) continue;
+                double value = 1.0;
+                if (w instanceof SliderWidget) {
+                    value = w.w() <= 0 ? 0.0 : (double) (px - w.x()) / (double) w.w();
+                }
+                interactive.onWidgetInput(value);
+                return;
+            }
+        });
+    }
+
+    private static WNode findNodeById(WGraph g, UUID id) {
+        for (WNode n : g.getNodes()) {
+            if (n.getId().equals(id)) return n;
+            if (n instanceof FunctionCardNode fc) {
+                WNode hit = findNodeById(fc.getInnerGraph(), id);
+                if (hit != null) return hit;
+            }
+        }
+        return null;
     }
 }

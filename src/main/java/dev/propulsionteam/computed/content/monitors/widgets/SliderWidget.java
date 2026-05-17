@@ -1,0 +1,28 @@
+package dev.propulsionteam.computed.content.monitors.widgets;
+
+import net.minecraft.network.FriendlyByteBuf;
+
+import java.util.UUID;
+
+public record SliderWidget(
+        UUID id, int x, int y, int w, int h,
+        double value, double min, double max, int colorArgb) implements Widget {
+    @Override public WidgetType type() { return WidgetType.SLIDER; }
+
+    @Override
+    public void encodeBody(FriendlyByteBuf buf) {
+        buf.writeDouble(value);
+        buf.writeDouble(min);
+        buf.writeDouble(max);
+        buf.writeInt(colorArgb);
+    }
+
+    public static SliderWidget decode(FriendlyByteBuf buf) {
+        Header h = Widget.readHeader(buf);
+        double v = buf.readDouble();
+        double lo = buf.readDouble();
+        double hi = buf.readDouble();
+        int color = buf.readInt();
+        return new SliderWidget(h.id(), h.x(), h.y(), h.w(), h.h(), v, lo, hi, color);
+    }
+}

@@ -1,6 +1,7 @@
 package dev.propulsionteam.computed.content.monitors;
 
 import dev.propulsionteam.computed.content.ComputedRegistries;
+import dev.propulsionteam.computed.content.monitors.widgets.WidgetDrawList;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
@@ -8,7 +9,6 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -20,10 +20,15 @@ public class MonitorBlockEntity extends BlockEntity {
     public static final int MAX_WIDTH = 8;
     public static final int MAX_HEIGHT = 6;
 
+    /** Owner binding is cleared if not refreshed by the Peripheral node within this many ticks. */
+    private static final int OWNER_EXPIRY_TICKS = 5;
+
     private static final String NBT_X = "XIndex";
     private static final String NBT_Y = "YIndex";
     private static final String NBT_WIDTH = "Width";
     private static final String NBT_HEIGHT = "Height";
+    private static final String NBT_OWNER = "OwnerPos";
+    private static final String NBT_DRAW_LIST = "DrawList";
 
     private int width = 1;
     private int height = 1;
@@ -31,6 +36,10 @@ public class MonitorBlockEntity extends BlockEntity {
     private int yIndex = 0;
 
     private boolean needsUpdate = false;
+
+    @Nullable private BlockPos ownerComputerPos;
+    private int ticksSinceOwnerRefresh = Integer.MAX_VALUE / 2;
+    private WidgetDrawList currentDrawList = WidgetDrawList.EMPTY;
 
     public MonitorBlockEntity(BlockPos pos, BlockState state) {
         super(ComputedRegistries.MONITOR_BLOCK_ENTITY.get(), pos, state);
@@ -47,6 +56,12 @@ public class MonitorBlockEntity extends BlockEntity {
         tag.putInt(NBT_Y, yIndex);
         tag.putInt(NBT_WIDTH, width);
         tag.putInt(NBT_HEIGHT, height);
+        if (ownerComputerPos != null) {
+            tag.putLong(NBT_OWNER, ownerComputerPos.asLong());
+        }
+        if (!currentDrawList.isEmpty()) {
+            tag.put(NBT_DRAW_LIST, currentDrawList.toNbt());
+        }
     }
 
     @Override
@@ -56,6 +71,10 @@ public class MonitorBlockEntity extends BlockEntity {
         yIndex = tag.getInt(NBT_Y);
         width = Math.max(1, tag.getInt(NBT_WIDTH));
         height = Math.max(1, tag.getInt(NBT_HEIGHT));
+        ownerComputerPos = tag.contains(NBT_OWNER) ? BlockPos.of(tag.getLong(NBT_OWNER)) : null;
+        currentDrawList = tag.contains(NBT_DRAW_LIST)
+                ? WidgetDrawList.fromNbt(tag.getCompound(NBT_DRAW_LIST))
+                : WidgetDrawList.EMPTY;
     }
 
     @Override
@@ -70,6 +89,10 @@ public class MonitorBlockEntity extends BlockEntity {
         tag.putInt(NBT_Y, yIndex);
         tag.putInt(NBT_WIDTH, width);
         tag.putInt(NBT_HEIGHT, height);
+        if (ownerComputerPos != null) {
+            tag.putLong(NBT_OWNER, ownerComputerPos.asLong());
+        }
+        tag.put(NBT_DRAW_LIST, currentDrawList.toNbt());
         return tag;
     }
 
@@ -83,6 +106,64 @@ public class MonitorBlockEntity extends BlockEntity {
     void updateNeighborsDeferred() {
         needsUpdate = true;
     }
+
+    /** Server-side ticker: expires stale owner bindings so an orphaned monitor goes blank. */
+    public static void serverTick(net.minecraft.world.level.Level level, BlockPos pos, BlockState state, MonitorBlockEntity be) {
+        if (be.ownerComputerPos == null) return;
+        if (be.xIndex != 0 || be.yIndex != 0) return;
+        be.ticksSinceOwnerRefresh++;
+        if (be.ticksSinceOwnerRefresh > OWNER_EXPIRY_TICKS) {
+            be.ownerComputerPos = null;
+            if (!be.currentDrawList.isEmpty()) {
+                be.currentDrawList = WidgetDrawList.EMPTY;
+            }
+            be.setChanged();
+            level.sendBlockUpdated(pos, state, state, Block.UPDATE_CLIENTS);
+        }
+    }
+
+    // region Owner + draw list
+
+    /** Called by {@code PeripheralNode.evaluate} each graph tick to claim/refresh ownership of this monitor. */
+    public void bindOwner(BlockPos computerPos) {
+        boolean changed = !computerPos.equals(this.ownerComputerPos);
+        this.ownerComputerPos = computerPos;
+        this.ticksSinceOwnerRefresh = 0;
+        if (changed) {
+            setChanged();
+            if (level != null) {
+                level.sendBlockUpdated(getBlockPos(), getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
+            }
+        }
+    }
+
+    @Nullable
+    public BlockPos getOwnerComputerPos() {
+        return ownerComputerPos;
+    }
+
+    /** Replaces the current draw list. Only marks dirty / re-syncs when the content hash actually changed. */
+    public void setDrawList(WidgetDrawList list) {
+        if (list == null) list = WidgetDrawList.EMPTY;
+        if (list.hash() == currentDrawList.hash() && list.equals(currentDrawList)) return;
+        this.currentDrawList = list;
+        setChanged();
+        if (level != null && !level.isClientSide) {
+            level.sendBlockUpdated(getBlockPos(), getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
+        }
+    }
+
+    public WidgetDrawList getDrawList() {
+        return currentDrawList;
+    }
+
+    /** Public version of the internal origin lookup. Returns null if the origin chunk is not loaded. */
+    @Nullable
+    public MonitorBlockEntity findOrigin() {
+        return getOrigin();
+    }
+
+    // endregion
 
     // region Sizing and placement
 
@@ -149,7 +230,7 @@ public class MonitorBlockEntity extends BlockEntity {
         return getLoadedMonitor(0, 0).getMonitor();
     }
 
-    BlockPos toWorldPos(int x, int y) {
+    public BlockPos toWorldPos(int x, int y) {
         if (xIndex == x && yIndex == y) return getBlockPos();
         return getBlockPos().relative(getRight(), -xIndex + x).relative(getDown(), -yIndex + y);
     }
