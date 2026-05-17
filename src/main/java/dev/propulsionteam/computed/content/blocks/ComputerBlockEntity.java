@@ -190,32 +190,62 @@ public class ComputerBlockEntity extends BaseContainerBlockEntity {
     public void applyGraphFromNetwork(CompoundTag tag) {
         CompoundTag copy = tag.copy();
         Peripherals.stripEditorOnlyTags(copy);
-        CompoundTag incomingGraph;
-        CompoundTag incomingFunctions;
+        java.util.Map<UUID, double[]> inputSnap = new java.util.HashMap<>();
+        java.util.Map<UUID, double[]> outputSnap = new java.util.HashMap<>();
+        snapshotPinValues(graph, inputSnap, outputSnap);
         if (copy.contains("ComputerGraph", Tag.TAG_COMPOUND)) {
-            incomingGraph = copy.getCompound("ComputerGraph");
-            incomingFunctions = new CompoundTag();
+            graph.load(copy.getCompound("ComputerGraph"));
+            functionDefinitions.clear();
             if (copy.contains("ComputerFunctions")) {
-                incomingFunctions.put("list", copy.getList("ComputerFunctions", Tag.TAG_COMPOUND));
+                functionDefinitions.load(copy.getList("ComputerFunctions", Tag.TAG_COMPOUND));
             }
         } else {
-            incomingGraph = copy;
-            incomingFunctions = new CompoundTag();
-        }
-        CompoundTag currentFunctions = new CompoundTag();
-        currentFunctions.put("list", functionDefinitions.saveList());
-        if (incomingGraph.equals(graph.save()) && incomingFunctions.equals(currentFunctions)) {
-            return;
-        }
-        graph.load(incomingGraph);
-        functionDefinitions.clear();
-        if (incomingFunctions.contains("list", Tag.TAG_LIST)) {
-            functionDefinitions.load(incomingFunctions.getList("list", Tag.TAG_COMPOUND));
+            graph.load(copy);
+            functionDefinitions.clear();
         }
         FunctionCardNode.applyLibraryToInnerGraphs(graph, functionDefinitions);
+        restorePinValues(graph, inputSnap, outputSnap);
         setChanged();
         if (level != null) {
             level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_ALL);
+        }
+    }
+
+    private static void snapshotPinValues(WGraph g,
+                                          java.util.Map<UUID, double[]> ins,
+                                          java.util.Map<UUID, double[]> outs) {
+        for (WNode n : g.getNodes()) {
+            double[] in = new double[n.getInputs().size()];
+            for (int i = 0; i < in.length; i++) in[i] = n.getInputs().get(i).getValue();
+            double[] out = new double[n.getOutputs().size()];
+            for (int i = 0; i < out.length; i++) out[i] = n.getOutputs().get(i).getValue();
+            ins.put(n.getId(), in);
+            outs.put(n.getId(), out);
+            if (n instanceof FunctionCardNode fc) {
+                snapshotPinValues(fc.getInnerGraph(), ins, outs);
+            }
+        }
+    }
+
+    private static void restorePinValues(WGraph g,
+                                         java.util.Map<UUID, double[]> ins,
+                                         java.util.Map<UUID, double[]> outs) {
+        for (WNode n : g.getNodes()) {
+            double[] in = ins.get(n.getId());
+            if (in != null) {
+                for (int i = 0; i < Math.min(in.length, n.getInputs().size()); i++) {
+                    n.getInputs().get(i).setValue(in[i]);
+                }
+            }
+            double[] out = outs.get(n.getId());
+            if (out != null) {
+                for (int i = 0; i < Math.min(out.length, n.getOutputs().size()); i++) {
+                    n.getOutputs().get(i).setValue(out[i]);
+                }
+            }
+            if (n instanceof FunctionCardNode fc) {
+                restorePinValues(fc.getInnerGraph(), ins, outs);
+            }
         }
     }
 
