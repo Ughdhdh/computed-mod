@@ -5,6 +5,7 @@ import dev.devce.websnodelib.api.NodeRegistry;
 import dev.propulsionteam.computed.Computed;
 import dev.propulsionteam.computed.content.nodes.create.CreateRedstoneLinkReceiverNode;
 import dev.propulsionteam.computed.content.nodes.create.CreateRedstoneLinkSenderNode;
+import dev.propulsionteam.computed.content.nodes.vanilla.RedstoneInputNode;
 import dev.propulsionteam.computed.content.nodes.vanilla.RedstonePortNode;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -36,6 +37,10 @@ public final class ComputedNodes {
 
         NodeRegistry.register(RedstonePortNode.TYPE_ID, RedstonePortNode::new);
         NodeMenuRegistry.addNodeEntry(
-                MENU_VANILLA, RedstonePortNode.TYPE_ID, Component.literal("Redstone"));
+                MENU_VANILLA, RedstonePortNode.TYPE_ID, Component.literal("Redstone Output"));
+
+        NodeRegistry.register(RedstoneInputNode.TYPE_ID, RedstoneInputNode::new);
+        NodeMenuRegistry.addNodeEntry(
+                MENU_VANILLA, RedstoneInputNode.TYPE_ID, Component.literal("Redstone Input"));
     }
 }

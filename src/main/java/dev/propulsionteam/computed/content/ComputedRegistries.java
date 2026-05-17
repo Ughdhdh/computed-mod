@@ -3,6 +3,7 @@ package dev.propulsionteam.computed.content;
 import dev.propulsionteam.computed.Computed;
 import dev.propulsionteam.computed.content.blocks.ComputerBlock;
 import dev.propulsionteam.computed.content.blocks.ComputerBlockEntity;
+import dev.propulsionteam.computed.content.blocks.ComputerBlockItem;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.BlockItem;
@@ -57,7 +58,9 @@ public final class ComputedRegistries {
                     props -> new ComputerBlock(
                             BlockBehaviour.Properties.ofFullCopy(Blocks.IRON_BLOCK).noOcclusion()));
     public static final DeferredItem<BlockItem> COMPUTER_BLOCK_ITEM =
-            ITEMS.registerSimpleBlockItem("computer", COMPUTER_BLOCK);
+            ITEMS.register(
+                    "computer",
+                    () -> new ComputerBlockItem(COMPUTER_BLOCK.get(), new Item.Properties()));
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ComputerBlockEntity>> COMPUTER_BLOCK_ENTITY =
             BLOCK_ENTITY_TYPES.register(

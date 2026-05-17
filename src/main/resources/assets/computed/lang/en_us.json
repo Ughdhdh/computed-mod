@@ -1,6 +1,7 @@
 {
   "itemGroup.computed": "Computed",
   "block.computed.computer": "Computer",
+  "item.computed.computer.stored": "Stored Program — %s nodes, %s functions",
 
   "gui.computed.peripheral_not_available": "Not available",
   "gui.computed.function_needs_peripheral": "Needs hardware",

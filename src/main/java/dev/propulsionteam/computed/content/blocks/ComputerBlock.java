@@ -8,6 +8,10 @@ import dev.propulsionteam.computed.network.ComputedNetworking;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.world.level.storage.loot.LootParams;
+import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
+
+import java.util.List;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
@@ -158,6 +162,32 @@ public class ComputerBlock extends Block implements EntityBlock {
         Peripherals.writePeripheralUnlockTag(computer, bundle);
         PacketDistributor.sendToPlayer(serverPlayer, ComputedNetworking.openPayload(pos, bundle));
         return InteractionResult.CONSUME;
+    }
+
+    @Override
+    public BlockState playerWillDestroy(Level level, BlockPos pos, BlockState state, Player player) {
+        if (!level.isClientSide
+                && level.getBlockEntity(pos) instanceof ComputerBlockEntity be
+                && be.hasStoredState()) {
+            be.getOrCreateUuid();
+            ItemStack stack = new ItemStack(ComputedRegistries.COMPUTER_BLOCK_ITEM.get());
+            CompoundTag beTag = be.saveCustomOnly(level.registryAccess());
+            if (!beTag.isEmpty()) {
+                net.minecraft.world.item.BlockItem.setBlockEntityData(stack, be.getType(), beTag);
+            }
+            popResource(level, pos, stack);
+            be.markDropsHandled();
+        }
+        return super.playerWillDestroy(level, pos, state, player);
+    }
+
+    @Override
+    protected List<ItemStack> getDrops(BlockState state, LootParams.Builder params) {
+        BlockEntity be = params.getOptionalParameter(LootContextParams.BLOCK_ENTITY);
+        if (be instanceof ComputerBlockEntity computer && computer.dropsHandled()) {
+            return List.of();
+        }
+        return super.getDrops(state, params);
     }
 
     @Override

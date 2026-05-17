@@ -34,6 +34,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
 
 public class ComputerBlockEntity extends BaseContainerBlockEntity {
     public static final int CONTAINER_SIZE = 9;
@@ -45,6 +46,8 @@ public class ComputerBlockEntity extends BaseContainerBlockEntity {
     /** Weak redstone emitted toward each {@link Direction} (neighbor on that side sees this level). */
     private final int[] redstoneEmitted = new int[6];
     private final CreateRedstoneLinkBridge createRedstoneLinks = new CreateRedstoneLinkBridge();
+    private UUID computerUuid;
+    private transient boolean dropsHandled;
 
     public ComputerBlockEntity(BlockPos pos, BlockState state) {
         super(ComputedRegistries.COMPUTER_BLOCK_ENTITY.get(), pos, state);
@@ -187,15 +190,27 @@ public class ComputerBlockEntity extends BaseContainerBlockEntity {
     public void applyGraphFromNetwork(CompoundTag tag) {
         CompoundTag copy = tag.copy();
         Peripherals.stripEditorOnlyTags(copy);
+        CompoundTag incomingGraph;
+        CompoundTag incomingFunctions;
         if (copy.contains("ComputerGraph", Tag.TAG_COMPOUND)) {
-            graph.load(copy.getCompound("ComputerGraph"));
-            functionDefinitions.clear();
+            incomingGraph = copy.getCompound("ComputerGraph");
+            incomingFunctions = new CompoundTag();
             if (copy.contains("ComputerFunctions")) {
-                functionDefinitions.load(copy.getList("ComputerFunctions", Tag.TAG_COMPOUND));
+                incomingFunctions.put("list", copy.getList("ComputerFunctions", Tag.TAG_COMPOUND));
             }
         } else {
-            graph.load(copy);
-            functionDefinitions.clear();
+            incomingGraph = copy;
+            incomingFunctions = new CompoundTag();
+        }
+        CompoundTag currentFunctions = new CompoundTag();
+        currentFunctions.put("list", functionDefinitions.saveList());
+        if (incomingGraph.equals(graph.save()) && incomingFunctions.equals(currentFunctions)) {
+            return;
+        }
+        graph.load(incomingGraph);
+        functionDefinitions.clear();
+        if (incomingFunctions.contains("list", Tag.TAG_LIST)) {
+            functionDefinitions.load(incomingFunctions.getList("list", Tag.TAG_COMPOUND));
         }
         FunctionCardNode.applyLibraryToInnerGraphs(graph, functionDefinitions);
         setChanged();
@@ -243,6 +258,7 @@ public class ComputerBlockEntity extends BaseContainerBlockEntity {
         } else {
             functionDefinitions.clear();
         }
+        computerUuid = tag.hasUUID("ComputerUUID") ? tag.getUUID("ComputerUUID") : null;
         hydrateFunctionCardsFromLibrary();
     }
 
@@ -252,6 +268,34 @@ public class ComputerBlockEntity extends BaseContainerBlockEntity {
         ContainerHelper.saveAllItems(tag, items, true, registries);
         tag.put("ComputerGraph", graph.save());
         tag.put("ComputerFunctions", functionDefinitions.saveList());
+        if (computerUuid != null) {
+            tag.putUUID("ComputerUUID", computerUuid);
+        }
+    }
+
+    public UUID getOrCreateUuid() {
+        if (computerUuid == null) {
+            computerUuid = UUID.randomUUID();
+            setChanged();
+        }
+        return computerUuid;
+    }
+
+    public boolean hasStoredState() {
+        if (!graph.getNodes().isEmpty()) return true;
+        if (!functionDefinitions.isEmpty()) return true;
+        for (ItemStack s : items) {
+            if (!s.isEmpty()) return true;
+        }
+        return false;
+    }
+
+    public void markDropsHandled() {
+        dropsHandled = true;
+    }
+
+    public boolean dropsHandled() {
+        return dropsHandled;
     }
 
     @Override
