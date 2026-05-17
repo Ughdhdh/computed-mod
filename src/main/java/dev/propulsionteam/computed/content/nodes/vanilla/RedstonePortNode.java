@@ -21,7 +21,7 @@ public final class RedstonePortNode extends WNode {
     private final WDropdown<RelativeFace> faceDropdown;
 
     public RedstonePortNode(int x, int y) {
-        super(TYPE_ID, "Redstone", x, y);
+        super(TYPE_ID, "Redstone Output", x, y);
         addInput("Tick", 0xFF00FF88);
         addInput("Level", 0xFFFF6655);
         faceDropdown = new WDropdown<>(
