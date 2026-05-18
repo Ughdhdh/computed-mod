@@ -10,6 +10,9 @@ import dev.propulsionteam.computed.content.nodes.vanilla.ComparatorReadNode;
 import dev.propulsionteam.computed.content.nodes.vanilla.RedstoneInputNode;
 import dev.propulsionteam.computed.content.nodes.vanilla.RedstonePortNode;
 import dev.propulsionteam.computed.content.nodes.vanilla.WorldTimeNode;
+import dev.propulsionteam.computed.content.nodes.vanilla.BlockLocationNode;
+import dev.propulsionteam.computed.content.nodes.vanilla.BlockRotationNode;
+import dev.propulsionteam.computed.content.nodes.vanilla.ConcatenateTextNode;
 import dev.propulsionteam.computed.content.nodes.widgets.ButtonWidgetNode;
 import dev.propulsionteam.computed.content.nodes.widgets.ClockWidgetNode;
 import dev.propulsionteam.computed.content.nodes.widgets.ColorSourceNode;
@@ -74,6 +77,18 @@ public final class ComputedNodes {
         NodeMenuRegistry.addNodeEntry(
                 MENU_VANILLA, BlockPresenceNode.TYPE_ID, Component.literal("Block Presence"));
 
+        NodeRegistry.register(BlockLocationNode.TYPE_ID, BlockLocationNode::new);
+        NodeMenuRegistry.addNodeEntry(
+                MENU_VANILLA, BlockLocationNode.TYPE_ID, Component.literal("Block Location"));
+
+        NodeRegistry.register(ConcatenateTextNode.TYPE_ID, ConcatenateTextNode::new);
+        NodeMenuRegistry.addNodeEntry(
+                MENU_VANILLA, ConcatenateTextNode.TYPE_ID, Component.literal("Concatenate Strings"));
+
+        NodeRegistry.register(BlockRotationNode.TYPE_ID, BlockRotationNode::new);
+        NodeMenuRegistry.addNodeEntry(
+                MENU_VANILLA, BlockRotationNode.TYPE_ID, Component.literal("Block Rotation"));
+
         NodeMenuRegistry.registerCategory(MENU_WIDGETS, Component.literal("Widgets"), NodeMenuRegistry.ROOT);
         NodeMenuRegistry.registerCategory(MENU_PERIPHERALS, Component.literal("Peripherals"), NodeMenuRegistry.ROOT);
 
@@ -100,5 +115,6 @@ public final class ComputedNodes {
 
         NodeRegistry.register(WidgetNodeIds.PROGRESS_BAR_WIDGET, ProgressBarWidgetNode::new);
         NodeMenuRegistry.addNodeEntry(MENU_WIDGETS, WidgetNodeIds.PROGRESS_BAR_WIDGET, Component.literal("Progress Bar Widget"));
+
     }
 }
