@@ -32,6 +32,7 @@ import org.joml.Matrix4f;
 public class MonitorBlockEntityRenderer implements BlockEntityRenderer<MonitorBlockEntity> {
     /** Push the background this far forward of the block face so it doesn't z-fight with the block. */
     private static final float BACKGROUND_FORWARD_OFFSET = 0.0020f;
+    private static final float WIDGET_UNDERFILL_FORWARD_OFFSET = 0.0025f;
     private static final float WIDGET_FILL_FORWARD_OFFSET = 0.0030f;
     private static final float WIDGET_EDGE_FORWARD_OFFSET = 0.0040f;
     private static final float WIDGET_DETAIL_FORWARD_OFFSET = 0.0045f;
@@ -89,6 +90,7 @@ public class MonitorBlockEntityRenderer implements BlockEntityRenderer<MonitorBl
         fillBlockSpace(layer(screenMat, BACKGROUND_FORWARD_OFFSET), bgConsumer, 0, 0, usableW, usableH, 0xFF000000);
 
         Matrix4f widgetMat = new Matrix4f(screenMat).scale(usableW / logicalW, usableH / logicalH, 1f);
+        Matrix4f underfillMat = layer(widgetMat, WIDGET_UNDERFILL_FORWARD_OFFSET);
         Matrix4f fillMat = layer(widgetMat, WIDGET_FILL_FORWARD_OFFSET);
         Matrix4f edgeMat = layer(widgetMat, WIDGET_EDGE_FORWARD_OFFSET);
         Matrix4f detailMat = layer(widgetMat, WIDGET_DETAIL_FORWARD_OFFSET);
@@ -96,7 +98,7 @@ public class MonitorBlockEntityRenderer implements BlockEntityRenderer<MonitorBl
 
         Font font = Minecraft.getInstance().font;
         for (Widget w : be.getDrawList().widgets()) {
-            renderWidget(w, fillMat, edgeMat, detailMat, textMat, bufferSource, font);
+            renderWidget(w, underfillMat, fillMat, edgeMat, detailMat, textMat, bufferSource, font);
         }
 
         pose.popPose();
@@ -120,8 +122,8 @@ public class MonitorBlockEntityRenderer implements BlockEntityRenderer<MonitorBl
         pose.mulPose(rot);
     }
 
-    private void renderWidget(Widget w, Matrix4f fillMat, Matrix4f edgeMat, Matrix4f detailMat, Matrix4f textMat,
-                              MultiBufferSource bufferSource, Font font) {
+    private void renderWidget(Widget w, Matrix4f underfillMat, Matrix4f fillMat, Matrix4f edgeMat, Matrix4f detailMat,
+                              Matrix4f textMat, MultiBufferSource bufferSource, Font font) {
         VertexConsumer gui = bufferSource.getBuffer(RenderType.gui());
         if (w instanceof TextWidget tw) {
             outline(edgeMat, gui, tw.x(), tw.y(), tw.x() + tw.w(), tw.y() + tw.h(), 0xFFFFFFFF);
@@ -140,16 +142,51 @@ public class MonitorBlockEntityRenderer implements BlockEntityRenderer<MonitorBl
             outline(edgeMat, gui, bw.x(), bw.y(), bw.x() + bw.w(), bw.y() + bw.h(), 0xFFFFFFFF);
             drawCenteredText(font, textMat, bufferSource, bw.label(), bw.x(), bw.y(), bw.w(), bw.h(), 0xFFFFFFFF);
         } else if (w instanceof SliderWidget sw) {
-            fill(fillMat, gui, sw.x(), sw.y() + sw.h() / 2 - 2, sw.x() + sw.w(), sw.y() + sw.h() / 2 + 2, 0xFF202020);
+            int barY1 = sw.y() + sw.h() / 2 - 2;
+            int barY2 = sw.y() + sw.h() / 2 + 2;
+            fill(fillMat, gui, sw.x(), barY1, sw.x() + sw.w(), barY2, 0xFF202020);
             outline(edgeMat, gui, sw.x(), sw.y(), sw.x() + sw.w(), sw.y() + sw.h(), 0xFFFFFFFF);
-            double norm = sw.max() == sw.min() ? 0 : (sw.value() - sw.min()) / (sw.max() - sw.min());
-            int handleX = sw.x() + (int) (Mth.clamp(norm, 0.0, 1.0) * sw.w());
+            double range = sw.max() - sw.min();
+            int handleX;
+            if (sw.step() > 0 && range > 0) {
+                int ticks = (int) Math.floor(range / sw.step() + 1.0e-6);
+                if (ticks > 0 && ticks <= sw.w()) {
+                    for (int i = 0; i <= ticks; i++) {
+                        double t = Mth.clamp((i * sw.step()) / range, 0.0, 1.0);
+                        int tx = sw.x() + (int) Math.round(t * sw.w());
+                        fill(detailMat, gui, tx, barY1, tx + 1, barY2, 0xFFFFFFFF);
+                    }
+                }
+                int snappedIdx = (int) Math.round((sw.value() - sw.min()) / sw.step());
+                double t = Mth.clamp((snappedIdx * sw.step()) / range, 0.0, 1.0);
+                handleX = sw.x() + (int) Math.round(t * sw.w());
+            } else {
+                double norm = range == 0 ? 0 : (sw.value() - sw.min()) / range;
+                handleX = sw.x() + (int) (Mth.clamp(norm, 0.0, 1.0) * sw.w());
+            }
             fill(detailMat, gui, handleX - 3, sw.y(), handleX + 3, sw.y() + sw.h(), sw.colorArgb());
         } else if (w instanceof ProgressBarWidget pb) {
             double frac = pb.max() <= 0 ? 0 : Mth.clamp(pb.value() / pb.max(), 0.0, 1.0);
-            int fillEnd = pb.x() + (int) (frac * pb.w());
-            fill(fillMat, gui, pb.x(), pb.y(), fillEnd, pb.y() + pb.h(), pb.colorArgb());
             outline(edgeMat, gui, pb.x(), pb.y(), pb.x() + pb.w(), pb.y() + pb.h(), 0xFFFFFFFF);
+            int segs = pb.segments();
+            if (segs <= 0) {
+                int fillEnd = pb.x() + (int) (frac * pb.w());
+                fill(underfillMat, gui, pb.x(), pb.y(), fillEnd, pb.y() + pb.h(), pb.colorArgb());
+            } else {
+                int litSegs = (int) Math.floor(frac * segs + 1.0e-6);
+                int innerY = pb.y() + 2;
+                int innerH = Math.max(0, pb.h() - 4);
+                int innerW = Math.max(0, pb.w() - 4);
+                int gap = segs > 1 ? Math.min(2, Math.max(0, (innerW - segs) / Math.max(1, segs - 1))) : 0;
+                int segW = segs > 0 ? Math.max(1, (innerW - gap * (segs - 1)) / segs) : 0;
+                int contentW = segW * segs + gap * (segs - 1);
+                int leftPad = Math.max(0, (innerW - contentW) / 2);
+                int startX = pb.x() + 2 + leftPad;
+                for (int i = 0; i < litSegs; i++) {
+                    int sx = startX + i * (segW + gap);
+                    fill(underfillMat, gui, sx, innerY, sx + segW, innerY + innerH, pb.colorArgb());
+                }
+            }
         }
     }
 

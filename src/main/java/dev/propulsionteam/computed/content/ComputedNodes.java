@@ -33,23 +33,26 @@ public final class ComputedNodes {
             ResourceLocation.fromNamespaceAndPath("websnodelib", "menu_sources");
     private static final ResourceLocation MENU_WIDGETS =
             ResourceLocation.fromNamespaceAndPath(Computed.MODID, "menu_widgets");
+    private static final ResourceLocation MENU_PERIPHERALS =
+            ResourceLocation.fromNamespaceAndPath(Computed.MODID, "menu_peripherals");
 
     private ComputedNodes() {}
 
     public static void register() {
         NodeMenuRegistry.registerCategory(
                 MENU_VANILLA, Component.literal("Vanilla"), NodeMenuRegistry.ROOT);
-        NodeMenuRegistry.registerCategory(MENU_CREATE, Component.literal("Create"), NodeMenuRegistry.ROOT);
-        NodeMenuRegistry.registerCategory(
-                MENU_CREATE_REDSTONE_LINK, Component.literal("Redstone Link"), MENU_CREATE);
 
         NodeRegistry.register(CreateRedstoneLinkSenderNode.TYPE_ID, CreateRedstoneLinkSenderNode::new);
-        NodeMenuRegistry.addNodeEntry(
-                MENU_CREATE_REDSTONE_LINK, CreateRedstoneLinkSenderNode.TYPE_ID, Component.literal("Sender"));
-
         NodeRegistry.register(CreateRedstoneLinkReceiverNode.TYPE_ID, CreateRedstoneLinkReceiverNode::new);
-        NodeMenuRegistry.addNodeEntry(
-                MENU_CREATE_REDSTONE_LINK, CreateRedstoneLinkReceiverNode.TYPE_ID, Component.literal("Receiver"));
+        if (net.neoforged.fml.ModList.get().isLoaded("create")) {
+            NodeMenuRegistry.registerCategory(MENU_CREATE, Component.literal("Create"), NodeMenuRegistry.ROOT);
+            NodeMenuRegistry.registerCategory(
+                    MENU_CREATE_REDSTONE_LINK, Component.literal("Redstone Link"), MENU_CREATE);
+            NodeMenuRegistry.addNodeEntry(
+                    MENU_CREATE_REDSTONE_LINK, CreateRedstoneLinkSenderNode.TYPE_ID, Component.literal("Sender"));
+            NodeMenuRegistry.addNodeEntry(
+                    MENU_CREATE_REDSTONE_LINK, CreateRedstoneLinkReceiverNode.TYPE_ID, Component.literal("Receiver"));
+        }
 
         NodeRegistry.register(RedstonePortNode.TYPE_ID, RedstonePortNode::new);
         NodeMenuRegistry.addNodeEntry(
@@ -72,6 +75,7 @@ public final class ComputedNodes {
                 MENU_VANILLA, BlockPresenceNode.TYPE_ID, Component.literal("Block Presence"));
 
         NodeMenuRegistry.registerCategory(MENU_WIDGETS, Component.literal("Widgets"), NodeMenuRegistry.ROOT);
+        NodeMenuRegistry.registerCategory(MENU_PERIPHERALS, Component.literal("Peripherals"), NodeMenuRegistry.ROOT);
 
         NodeRegistry.register(WidgetNodeIds.TEXT_SOURCE, TextSourceNode::new);
         NodeMenuRegistry.addNodeEntry(MENU_SOURCES, WidgetNodeIds.TEXT_SOURCE, Component.literal("Text"));
@@ -80,7 +84,7 @@ public final class ComputedNodes {
         NodeMenuRegistry.addNodeEntry(MENU_SOURCES, WidgetNodeIds.COLOR_SOURCE, Component.literal("Color"));
 
         NodeRegistry.register(WidgetNodeIds.PERIPHERAL, PeripheralNode::new);
-        NodeMenuRegistry.addNodeEntry(MENU_WIDGETS, WidgetNodeIds.PERIPHERAL, Component.literal("Monitor Peripheral"));
+        NodeMenuRegistry.addNodeEntry(MENU_PERIPHERALS, WidgetNodeIds.PERIPHERAL, Component.literal("Monitor"));
 
         NodeRegistry.register(WidgetNodeIds.TEXT_WIDGET, TextWidgetNode::new);
         NodeMenuRegistry.addNodeEntry(MENU_WIDGETS, WidgetNodeIds.TEXT_WIDGET, Component.literal("Text Widget"));

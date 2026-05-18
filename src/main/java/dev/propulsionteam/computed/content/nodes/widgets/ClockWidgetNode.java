@@ -42,7 +42,7 @@ public final class ClockWidgetNode extends WNode {
         addOutput("Widget", WPin.DataType.WIDGET, WPin.COLOR_WIDGET_DEFAULT);
         setEvaluator(n -> {
             int colorIn = (int) Math.round(n.getInputs().get(0).getValue());
-            int color = colorIn == 0 ? 0xFFFFFFFF : (colorIn | 0xFF000000);
+            int color = colorIn == 0 ? 0xFF00FF88 : (colorIn | 0xFF000000);
             n.getOutputs().get(0).setWidgetValue(
                     layout.wrap(new ClockWidget(n.getId(), layout.x(), layout.y(), layout.width(), layout.height(),
                             color, format == Format.HH_MM_SS, alignment)));

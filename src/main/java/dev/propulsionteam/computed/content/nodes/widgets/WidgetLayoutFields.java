@@ -43,7 +43,7 @@ public final class WidgetLayoutFields {
         wField.setValue(Integer.toString(defaultW));
         hField.setValue(Integer.toString(defaultH));
         lineField.setValue("1");
-        scaleField.setValue("1.0");
+        scaleField.setValue("1");
         modeDropdown = new WDropdown<>(
                 92,
                 List.of(LayoutManagedWidget.LayoutMode.values()),
@@ -75,8 +75,7 @@ public final class WidgetLayoutFields {
     public int line()   { return Math.max(1, parseIntOr(lineField.getValue(), 1)); }
 
     public double scale() {
-        double value = parseDoubleOr(scaleField.getValue(), 1.0);
-        return Math.max(1.0, Math.round(value));
+        return Math.max(1, parseIntOr(scaleField.getValue(), 1));
     }
 
     public void saveTo(CompoundTag tag) {

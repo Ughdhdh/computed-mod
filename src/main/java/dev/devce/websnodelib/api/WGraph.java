@@ -523,7 +523,27 @@ public class WGraph {
         }
     }
 
+    private static String formatNumberForString(double v) {
+        if (Math.abs(v - Math.rint(v)) < 1.0e-9 && Math.abs(v) < 1e15) {
+            return Long.toString((long) Math.rint(v));
+        }
+        return Double.toString(v);
+    }
+
     private void propagateConnections() {
+        for (WNode node : nodes) {
+            for (WPin pin : node.getInputs()) {
+                pin.setConnected(false);
+                switch (pin.getDataType()) {
+                    case NUMBER -> pin.setValue(0.0);
+                    case STRING -> pin.setStringValue("");
+                    case WIDGET -> pin.setWidgetValue(null);
+                }
+            }
+            for (WPin pin : node.getOutputs()) {
+                pin.setConnected(false);
+            }
+        }
         for (WConnection conn : connections) {
             WNode source = findNode(conn.sourceNode());
             WNode target = findNode(conn.targetNode());
@@ -541,6 +561,12 @@ public class WGraph {
             WPin srcPin = source.getOutputs().get(sp);
             WPin tgtPin = target.getInputs().get(tp);
             if (srcPin.getDataType() != tgtPin.getDataType()) {
+                if (srcPin.getDataType() == WPin.DataType.NUMBER
+                        && tgtPin.getDataType() == WPin.DataType.STRING) {
+                    tgtPin.setStringValue(formatNumberForString(srcPin.getValue()));
+                    tgtPin.setConnected(true);
+                    srcPin.setConnected(true);
+                }
                 continue;
             }
             switch (srcPin.getDataType()) {

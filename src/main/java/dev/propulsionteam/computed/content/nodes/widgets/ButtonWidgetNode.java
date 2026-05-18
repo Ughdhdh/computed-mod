@@ -24,7 +24,7 @@ public final class ButtonWidgetNode extends WNode implements InteractiveWidgetNo
         setEvaluator(n -> {
             String label = n.getInputs().get(0).getStringValue();
             int colorIn = (int) Math.round(n.getInputs().get(1).getValue());
-            int color = colorIn == 0 ? 0xFF335577 : (colorIn | 0xFF000000);
+            int color = colorIn == 0 ? 0xFF00FF88 : (colorIn | 0xFF000000);
             n.getOutputs().get(0).setWidgetValue(
                     layout.wrap(new ButtonWidget(n.getId(), layout.x(), layout.y(), layout.width(), layout.height(),
                             label == null ? "" : label, color)));

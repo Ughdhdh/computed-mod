@@ -65,8 +65,8 @@ public class WNodeScreen extends Screen {
     /** Target minimum stroke width on screen (px); grows in graph space when zoomed out so lines stay visible. */
     private static final float GRID_LINE_WIDTH_SCREEN_PX = 1.35f;
 
-    /** Fills the window; inset becomes 0. */
-    private boolean editorFullscreen;
+    /** Fills the window; inset becomes 0. Always on — windowed mode just hides content for no gain. */
+    private final boolean editorFullscreen = true;
     private static final int FULLSCREEN_BTN = 22;
     private static final int FULLSCREEN_BTN_PAD = 6;
     private static final int ICON_SIZE = 16;
@@ -1937,7 +1937,6 @@ public class WNodeScreen extends Screen {
         renderNodeActionDock(graphics, mouseX, mouseY, ease);
 
         renderSectionsSidebar(graphics, mouseX, mouseY, ease);
-        renderFullscreenToggle(graphics, mouseX, mouseY, ease);
         renderSchematicToolbar(graphics, mouseX, mouseY, ease);
 
         if (isSearching) {
@@ -3936,11 +3935,6 @@ public class WNodeScreen extends Screen {
             functionImportSubmenuOpen = false;
             playUiClick(0.98f);
         }
-        if (button == 0 && fullscreenBtnContains(mouseX, mouseY)) {
-            editorFullscreen = !editorFullscreen;
-            playUiClick(editorFullscreen ? 1.06f : 0.96f);
-            return true;
-        }
         if (button == 0 && sectionsToggleContains(mouseX, mouseY)) {
             showSectionsSidebar = !showSectionsSidebar;
             playUiClick(showSectionsSidebar ? 1.01f : 0.94f);
@@ -4256,7 +4250,9 @@ public class WNodeScreen extends Screen {
                     }
                     dev.devce.websnodelib.api.WPin srcPin = linkingNode.getOutputs().get(linkingPin);
                     dev.devce.websnodelib.api.WPin tgtPin = node.getInputs().get(inPin);
-                    if (srcPin.getDataType() != tgtPin.getDataType()) {
+                    if (srcPin.getDataType() != tgtPin.getDataType()
+                            && !(srcPin.getDataType() == dev.devce.websnodelib.api.WPin.DataType.NUMBER
+                                    && tgtPin.getDataType() == dev.devce.websnodelib.api.WPin.DataType.STRING)) {
                         playUiClick(0.82f);
                         continue;
                     }
@@ -4422,11 +4418,18 @@ public class WNodeScreen extends Screen {
             return true;
         }
         if (draggingNode != null) {
-            float s = editorContentScale();
-            double dx = dragX / s;
-            double dy = dragY / s;
-            int idx = (int) dx;
-            int idy = (int) dy;
+            int idx;
+            int idy;
+            if (Screen.hasShiftDown()) {
+                float s = editorContentScale();
+                idx = (int) (dragX / s);
+                idy = (int) (dragY / s);
+            } else {
+                int targetX = screenToGraphX(mouseX) - (int) dragOffsetX;
+                int targetY = screenToGraphY(mouseY) - (int) dragOffsetY;
+                idx = targetX - draggingNode.getX();
+                idy = targetY - draggingNode.getY();
+            }
             if (idx != 0 || idy != 0) {
                 List<UUID> moved = new ArrayList<>();
                 for (WNode n : graph.getNodes()) {
@@ -4437,8 +4440,8 @@ public class WNodeScreen extends Screen {
                 if (!moved.isEmpty()) {
                     graph.shiftWaypointsForConnectionsTouching(moved, idx, idy);
                 }
+                for (WNode n : graph.getNodes()) if (n.isSelected()) n.setPos(n.getX() + idx, n.getY() + idy);
             }
-            for (WNode n : graph.getNodes()) if (n.isSelected()) n.setPos(n.getX() + idx, n.getY() + idy);
             return true;
         }
         return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);

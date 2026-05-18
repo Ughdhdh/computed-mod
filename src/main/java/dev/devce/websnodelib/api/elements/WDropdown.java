@@ -48,6 +48,7 @@ public class WDropdown<T> extends WElement {
     private void setOpen(boolean v) {
         this.open = v;
         this.height = v ? HEADER_H + options.size() * ROW_H : HEADER_H;
+        markLayoutDirty();
     }
 
     @Override

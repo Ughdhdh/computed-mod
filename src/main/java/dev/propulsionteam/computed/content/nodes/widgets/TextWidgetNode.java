@@ -31,7 +31,7 @@ public final class TextWidgetNode extends WNode {
         setEvaluator(n -> {
             String text = n.getInputs().get(0).getStringValue();
             int colorIn = (int) Math.round(n.getInputs().get(1).getValue());
-            int color = colorIn == 0 ? 0xFFFFFFFF : (colorIn | 0xFF000000);
+            int color = colorIn == 0 ? 0xFF00FF88 : (colorIn | 0xFF000000);
             n.getOutputs().get(0).setWidgetValue(
                     layout.wrap(new TextWidget(n.getId(), layout.x(), layout.y(), layout.width(), layout.height(),
                             text == null ? "" : text, color, alignment)));

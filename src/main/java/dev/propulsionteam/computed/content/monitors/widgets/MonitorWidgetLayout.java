@@ -78,10 +78,10 @@ public final class MonitorWidgetLayout {
             return new ButtonWidget(bw.id(), x, y, w, h, bw.label(), bw.colorArgb());
         }
         if (raw instanceof SliderWidget sw) {
-            return new SliderWidget(sw.id(), x, y, w, h, sw.value(), sw.min(), sw.max(), sw.colorArgb());
+            return new SliderWidget(sw.id(), x, y, w, h, sw.value(), sw.min(), sw.max(), sw.colorArgb(), sw.step());
         }
         if (raw instanceof ProgressBarWidget pb) {
-            return new ProgressBarWidget(pb.id(), x, y, w, h, pb.value(), pb.max(), pb.colorArgb());
+            return new ProgressBarWidget(pb.id(), x, y, w, h, pb.value(), pb.max(), pb.colorArgb(), pb.segments());
         }
         return raw;
     }

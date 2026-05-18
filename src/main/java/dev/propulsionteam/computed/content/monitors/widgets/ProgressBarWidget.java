@@ -6,7 +6,7 @@ import java.util.UUID;
 
 public record ProgressBarWidget(
         UUID id, int x, int y, int w, int h,
-        double value, double max, int colorArgb) implements Widget {
+        double value, double max, int colorArgb, int segments) implements Widget {
     @Override public WidgetType type() { return WidgetType.PROGRESS_BAR; }
 
     @Override
@@ -14,6 +14,7 @@ public record ProgressBarWidget(
         buf.writeDouble(value);
         buf.writeDouble(max);
         buf.writeInt(colorArgb);
+        buf.writeInt(segments);
     }
 
     public static ProgressBarWidget decode(FriendlyByteBuf buf) {
@@ -21,6 +22,7 @@ public record ProgressBarWidget(
         double v = buf.readDouble();
         double m = buf.readDouble();
         int color = buf.readInt();
-        return new ProgressBarWidget(h.id(), h.x(), h.y(), h.w(), h.h(), v, m, color);
+        int segs = buf.readInt();
+        return new ProgressBarWidget(h.id(), h.x(), h.y(), h.w(), h.h(), v, m, color, segs);
     }
 }

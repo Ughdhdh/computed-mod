@@ -2,6 +2,7 @@ package dev.propulsionteam.computed.content.nodes.widgets;
 
 import dev.devce.websnodelib.api.WNode;
 import dev.devce.websnodelib.api.WPin;
+import dev.devce.websnodelib.api.elements.WButton;
 import dev.devce.websnodelib.api.elements.WDropdown;
 import dev.devce.websnodelib.api.elements.WLabel;
 import dev.propulsionteam.computed.content.blocks.ComputedGraphExecution;
@@ -15,6 +16,7 @@ import dev.propulsionteam.computed.content.nodes.vanilla.RelativeFace;
 import dev.propulsionteam.computed.network.ComputedNetworking;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 
@@ -26,14 +28,25 @@ import java.util.List;
  * widgets connected to its inputs as a draw list every graph tick.
  */
 public final class PeripheralNode extends WNode {
-    public static final int WIDGET_INPUT_COUNT = 8;
+    private static final int MIN_INPUTS = 1;
+    private static final int MAX_INPUTS = 16;
 
+    private int inputCount = 1;
     private RelativeFace face = RelativeFace.FRONT;
-    private final WDropdown<RelativeFace> faceDropdown;
+    private WDropdown<RelativeFace> faceDropdown;
 
     public PeripheralNode(int x, int y) {
-        super(WidgetNodeIds.PERIPHERAL, "Monitor Peripheral", x, y);
-        for (int i = 0; i < WIDGET_INPUT_COUNT; i++) {
+        super(WidgetNodeIds.PERIPHERAL, "Monitor", x, y);
+        rebuildUiAndPins();
+        setEvaluator(this::evaluateNode);
+    }
+
+    private void rebuildUiAndPins() {
+        getInputs().clear();
+        getOutputs().clear();
+        getElements().clear();
+
+        for (int i = 0; i < inputCount; i++) {
             addInput("W" + (i + 1), WPin.DataType.WIDGET, WPin.COLOR_WIDGET_DEFAULT);
         }
         faceDropdown = new WDropdown<>(
@@ -43,9 +56,21 @@ public final class PeripheralNode extends WNode {
                 face,
                 f -> face = f);
         addElement(faceDropdown);
+        addElement(new WButton("+ widget", 60, () -> {
+            if (inputCount < MAX_INPUTS) {
+                inputCount++;
+                rebuildUiAndPins();
+            }
+        }));
+        addElement(new WButton("- widget", 60, () -> {
+            if (inputCount > MIN_INPUTS) {
+                inputCount--;
+                rebuildUiAndPins();
+            }
+        }));
         addElement(new WLabel("Binds to monitor on chosen side", 0xFF888888));
         addElement(new WLabel("Screen px = monitor_blocks * 64", 0xFF888888));
-        setEvaluator(this::evaluateNode);
+        updateLayout();
     }
 
     private void evaluateNode(WNode n) {
@@ -62,6 +87,7 @@ public final class PeripheralNode extends WNode {
 
         List<Widget> widgets = new ArrayList<>(n.getInputs().size());
         for (var pin : n.getInputs()) {
+            if (!pin.isConnected()) continue;
             Object v = pin.getWidgetValue();
             if (v instanceof Widget w) widgets.add(w);
         }
@@ -78,11 +104,16 @@ public final class PeripheralNode extends WNode {
     public net.minecraft.nbt.CompoundTag save() {
         net.minecraft.nbt.CompoundTag tag = super.save();
         tag.putString("PeripheralFace", face.name());
+        tag.putInt("inputCount", inputCount);
         return tag;
     }
 
     @Override
     public void load(net.minecraft.nbt.CompoundTag tag) {
+        if (tag.contains("inputCount")) {
+            inputCount = Mth.clamp(tag.getInt("inputCount"), MIN_INPUTS, MAX_INPUTS);
+            rebuildUiAndPins();
+        }
         super.load(tag);
         if (tag.contains("PeripheralFace")) {
             try {

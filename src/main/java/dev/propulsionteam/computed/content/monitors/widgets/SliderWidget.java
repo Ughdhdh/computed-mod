@@ -6,7 +6,7 @@ import java.util.UUID;
 
 public record SliderWidget(
         UUID id, int x, int y, int w, int h,
-        double value, double min, double max, int colorArgb) implements Widget {
+        double value, double min, double max, int colorArgb, double step) implements Widget {
     @Override public WidgetType type() { return WidgetType.SLIDER; }
 
     @Override
@@ -15,6 +15,7 @@ public record SliderWidget(
         buf.writeDouble(min);
         buf.writeDouble(max);
         buf.writeInt(colorArgb);
+        buf.writeDouble(step);
     }
 
     public static SliderWidget decode(FriendlyByteBuf buf) {
@@ -23,6 +24,7 @@ public record SliderWidget(
         double lo = buf.readDouble();
         double hi = buf.readDouble();
         int color = buf.readInt();
-        return new SliderWidget(h.id(), h.x(), h.y(), h.w(), h.h(), v, lo, hi, color);
+        double step = buf.readDouble();
+        return new SliderWidget(h.id(), h.x(), h.y(), h.w(), h.h(), v, lo, hi, color, step);
     }
 }
