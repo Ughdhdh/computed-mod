@@ -33,7 +33,7 @@ public final class BlockRotationNode extends WNode {
             if (subLevel == null) return;
 
             Vector3d euler = new Vector3d();
-            subLevel.logicalPose().orientation().getEulerAnglesXYZ(euler);
+            subLevel.logicalPose().orientation().getEulerAnglesYXZ(euler);
 
             n.getOutputs().get(0).setValue(Math.toDegrees(euler.y));
             n.getOutputs().get(1).setValue(Math.toDegrees(euler.x));
