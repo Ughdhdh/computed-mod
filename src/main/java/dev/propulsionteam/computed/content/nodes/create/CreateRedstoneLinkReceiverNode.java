@@ -6,8 +6,7 @@ import dev.devce.websnodelib.api.elements.WCheckbox;
 import dev.devce.websnodelib.api.elements.WFrequencySlotPair;
 import dev.devce.websnodelib.api.elements.WLabel;
 import dev.propulsionteam.computed.Computed;
-import java.util.IdentityHashMap;
-import java.util.Map;
+import dev.propulsionteam.computed.content.blocks.ComputedGraphExecution;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
@@ -27,11 +26,6 @@ public final class CreateRedstoneLinkReceiverNode extends WNode {
     private final WCheckbox repeatWhile;
     private boolean prevPowered;
     private int linkStrength;
-    /**
-     * When mirrored across multiple Sable sub-levels, each mirror writes its own observed strength;
-     * the node's effective strength is the max. Keyed by proxy identity so removal is silent.
-     */
-    private final Map<Object, Integer> mirrorStrengths = new IdentityHashMap<>();
     /** Last {@link WGraph#getSimulationStepCounter()} for which repeat mode emitted an Event pulse. */
     private int lastRepeatEmitStep = Integer.MIN_VALUE;
 
@@ -46,8 +40,16 @@ public final class CreateRedstoneLinkReceiverNode extends WNode {
         addElement(repeatWhile);
         setEvaluator(
                 n -> {
-                    n.getOutputs().get(1).setValue(linkStrength);
-                    boolean on = linkStrength > 0;
+                    // linkStrength is server-only state (Create's network handler calls us via the
+                    // bridge). On the client, the editor runs its own copy of this evaluator each
+                    // tick — overwriting the pin would clobber the value loaded from the server's
+                    // NBT snapshot, leaving Display nodes stuck at 0. Use the snapshotted pin value
+                    // when there's no host (= we're on the client).
+                    int effective = ComputedGraphExecution.hostOrNull() == null
+                            ? (int) Math.round(n.getOutputs().get(1).getValue())
+                            : linkStrength;
+                    n.getOutputs().get(1).setValue(effective);
+                    boolean on = effective > 0;
                     if (repeatWhile.isChecked()) {
                         if (!on) {
                             n.getOutputs().get(0).setValue(0.0);
@@ -83,24 +85,5 @@ public final class CreateRedstoneLinkReceiverNode extends WNode {
 
     public void setLinkInputStrength(int strength) {
         linkStrength = Mth.clamp(strength, 0, 15);
-    }
-
-    public void setLinkInputStrengthFor(Object mirrorKey, int strength) {
-        int clamped = Mth.clamp(strength, 0, 15);
-        if (clamped == 0) {
-            mirrorStrengths.remove(mirrorKey);
-        } else {
-            mirrorStrengths.put(mirrorKey, clamped);
-        }
-        int max = 0;
-        for (int v : mirrorStrengths.values()) {
-            if (v > max) max = v;
-        }
-        linkStrength = max;
-    }
-
-    public void clearMirrors() {
-        mirrorStrengths.clear();
-        linkStrength = 0;
     }
 }

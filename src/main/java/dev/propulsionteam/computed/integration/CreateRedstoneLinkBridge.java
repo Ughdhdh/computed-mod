@@ -33,9 +33,6 @@ public final class CreateRedstoneLinkBridge {
 
     private record Registered(Object proxy, boolean transmit) {}
 
-    /** Per-node bookkeeping for receivers so we can clear their per-mirror map on resync. */
-    private final List<CreateRedstoneLinkReceiverNode> activeReceivers = new ArrayList<>();
-
     public static boolean isCreateLoaded() {
         if (createPresent != null) {
             return createPresent;
@@ -45,10 +42,6 @@ public final class CreateRedstoneLinkBridge {
     }
 
     public void clear(Level level) {
-        for (CreateRedstoneLinkReceiverNode r : activeReceivers) {
-            r.clearMirrors();
-        }
-        activeReceivers.clear();
         if (!isCreateLoaded() || level == null || level.isClientSide) {
             registered.clear();
             return;
@@ -111,14 +104,14 @@ public final class CreateRedstoneLinkBridge {
         if (couple == null) {
             return;
         }
-        Object proxy = makeProxy(computer, computer.getBlockPos(), couple, true, s::readTransmitStrength, (key, p) -> {});
+        Object proxy = makeProxy(computer, computer.getBlockPos(), couple, true, s::readTransmitStrength, p -> {});
         if (proxy == null) {
             return;
         }
         invokeAdd(handler, level, proxy);
         registered.add(new Registered(proxy, true));
         for (BlockPos mirrorPos : sableMirrorAnchors(level, computer.getBlockPos())) {
-            Object mirror = makeProxy(computer, mirrorPos, couple, true, s::readTransmitStrength, (key, p) -> {});
+            Object mirror = makeProxy(computer, mirrorPos, couple, true, s::readTransmitStrength, p -> {});
             if (mirror != null) {
                 invokeAdd(handler, level, mirror);
                 registered.add(new Registered(mirror, true));
@@ -133,19 +126,48 @@ public final class CreateRedstoneLinkBridge {
         if (couple == null) {
             return;
         }
-        activeReceivers.add(r);
-        Object proxy = makeProxy(computer, computer.getBlockPos(), couple, false, () -> 0, (key, p) -> r.setLinkInputStrengthFor(key, p));
+        Object proxy = makeProxy(computer, computer.getBlockPos(), couple, false, () -> 0, r::setLinkInputStrength);
         if (proxy == null) {
             return;
         }
         invokeAdd(handler, level, proxy);
         registered.add(new Registered(proxy, false));
+        warmupReceiver(handler, level, couple, proxy);
         for (BlockPos mirrorPos : sableMirrorAnchors(level, computer.getBlockPos())) {
-            Object mirror = makeProxy(computer, mirrorPos, couple, false, () -> 0, (key, p) -> r.setLinkInputStrengthFor(key, p));
+            Object mirror = makeProxy(computer, mirrorPos, couple, false, () -> 0, r::setLinkInputStrength);
             if (mirror != null) {
                 invokeAdd(handler, level, mirror);
                 registered.add(new Registered(mirror, false));
+                warmupReceiver(handler, level, couple, mirror);
             }
+        }
+    }
+
+    /**
+     * Create's {@code addToNetwork} immediately calls {@code updateNetworkOf(level, joiner)}, but
+     * {@code updateNetworkOf} explicitly skips the actor it pivots on when pushing — so a freshly
+     * added listener never gets the current network state from Create itself. We work around this
+     * by triggering {@code updateNetworkOf} on a different actor in the same network, which DOES
+     * push to our new proxy. If no other actor exists yet, the proxy stays at 0 until something
+     * external triggers, which is acceptable.
+     */
+    private static void warmupReceiver(Object handler, Level level, Object couple, Object justAdded) {
+        try {
+            java.lang.reflect.Field connectionsField = handler.getClass().getDeclaredField("connections");
+            connectionsField.setAccessible(true);
+            Object connections = connectionsField.get(handler);
+            java.util.Map<?, ?> perLevel = (java.util.Map<?, ?>) ((java.util.Map<?, ?>) connections).get(level);
+            if (perLevel == null) return;
+            Object network = perLevel.get(couple);
+            if (!(network instanceof Iterable<?> iter)) return;
+            Object pivot = null;
+            for (Object actor : iter) {
+                if (actor != justAdded) { pivot = actor; break; }
+            }
+            if (pivot == null) return;
+            Method update = handler.getClass().getMethod("updateNetworkOf", net.minecraft.world.level.LevelAccessor.class, Class.forName(IRL));
+            update.invoke(handler, level, pivot);
+        } catch (Throwable ignored) {
         }
     }
 
@@ -243,7 +265,7 @@ public final class CreateRedstoneLinkBridge {
             Object couple,
             boolean transmit,
             java.util.function.IntSupplier transmitLevel,
-            java.util.function.BiConsumer<Object, Integer> receiveConsumer) {
+            java.util.function.IntConsumer receiveConsumer) {
         try {
             Class<?> iface = Class.forName(IRL);
             ClassLoader cl = iface.getClassLoader();
@@ -258,7 +280,7 @@ public final class CreateRedstoneLinkBridge {
                         }
                         if ("setReceivedStrength".equals(name)) {
                             if (!transmit && args != null && args.length > 0 && args[0] instanceof Number num) {
-                                receiveConsumer.accept(proxy, num.intValue());
+                                receiveConsumer.accept(num.intValue());
                             }
                             return null;
                         }
