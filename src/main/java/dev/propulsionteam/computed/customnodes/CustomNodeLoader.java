@@ -55,6 +55,12 @@ public final class CustomNodeLoader {
         }
     }
 
+    /** Parses one definition from raw JSON text (used for server→client sync, where there is no file on disk). */
+    public CustomNodeDefinition parseRaw(String rawJson, String sourceLabel) {
+        JsonObject obj = JsonParser.parseString(rawJson).getAsJsonObject();
+        return parseDefinition(obj, Path.of(sourceLabel));
+    }
+
     private static CustomNodeDefinition parseDefinition(JsonObject obj, Path file) {
         ResourceLocation id = ResourceLocation.parse(requiredString(obj, "id"));
         String label = requiredString(obj, "label");

@@ -19,7 +19,6 @@ public final class CustomNodeRegistrar {
     public record ReloadSummary(int loaded, int skipped, int warnings, int errors, List<String> messages) {}
 
     public ReloadSummary reload(Path root) {
-        clearCustomRegistrations();
         CustomNodeLoader.LoadResult load = new CustomNodeLoader().load(root);
         List<String> messages = new ArrayList<>();
         for (String warning : load.diagnostics().warnings()) {
@@ -28,10 +27,19 @@ public final class CustomNodeRegistrar {
         for (String error : load.diagnostics().errors()) {
             messages.add("ERROR " + error);
         }
+        return applyDefinitions(load.definitions(), messages);
+    }
 
+    /** Replaces all custom registrations with the given definitions (used for server→client sync). */
+    public ReloadSummary applyDefinitions(List<CustomNodeDefinition> definitions) {
+        return applyDefinitions(definitions, new ArrayList<>());
+    }
+
+    private ReloadSummary applyDefinitions(List<CustomNodeDefinition> definitions, List<String> messages) {
+        clearCustomRegistrations();
         int loaded = 0;
         int skipped = 0;
-        for (CustomNodeDefinition def : load.definitions()) {
+        for (CustomNodeDefinition def : definitions) {
             if (NodeRegistry.isRegistered(def.id())) {
                 skipped++;
                 messages.add("WARN " + def.sourceFile() + ": id already registered: " + def.id());

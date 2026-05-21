@@ -5,6 +5,7 @@ import dev.devce.websnodelib.api.WGraph;
 import dev.devce.websnodelib.api.WNode;
 import dev.propulsionteam.computed.ComputerEditorBridge;
 import dev.propulsionteam.computed.content.blocks.ComputerBlockEntity;
+import dev.propulsionteam.computed.customnodes.ComputedCustomNodes;
 import dev.propulsionteam.computed.content.monitors.MonitorBlockEntity;
 import dev.propulsionteam.computed.content.monitors.widgets.SliderWidget;
 import dev.propulsionteam.computed.content.monitors.widgets.Widget;
@@ -15,6 +16,9 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.IEventBus;
+import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
+import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
@@ -37,6 +41,14 @@ public final class ComputedNetworking {
 
     public static void register(IEventBus modBus) {
         modBus.addListener(ComputedNetworking::registerPayloads);
+        NeoForge.EVENT_BUS.addListener(ComputedNetworking::onPlayerLogin);
+    }
+
+    /** Push the server's data-driven node definitions to a joining player so their editor and graphs match the server. */
+    private static void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            PacketDistributor.sendToPlayer(player, new SyncCustomNodesPayload(ComputedCustomNodes.readRawDefinitions()));
+        }
     }
 
     private static void registerPayloads(RegisterPayloadHandlersEvent event) {
@@ -53,6 +65,14 @@ public final class ComputedNetworking {
                 MonitorClickPayload.TYPE,
                 MonitorClickPayload.STREAM_CODEC,
                 ComputedNetworking::handleMonitorClick);
+        registrar.playToClient(
+                SyncCustomNodesPayload.TYPE,
+                SyncCustomNodesPayload.STREAM_CODEC,
+                ComputedNetworking::handleSyncCustomNodes);
+    }
+
+    private static void handleSyncCustomNodes(SyncCustomNodesPayload payload, IPayloadContext ctx) {
+        ctx.enqueueWork(() -> ComputedCustomNodes.applyServerDefinitions(payload.definitions()));
     }
 
     public static OpenComputerEditorPayload openPayload(BlockPos pos, CompoundTag graphTag) {

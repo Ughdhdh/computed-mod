@@ -65,6 +65,12 @@ public class ComputedClient {
     public ComputedClient(ModContainer container) {
         container.registerExtensionPoint(IConfigScreenFactory.class, ConfigurationScreen::new);
         NeoForge.EVENT_BUS.addListener(ComputedClient::onRegisterClientCommands);
+        NeoForge.EVENT_BUS.addListener(ComputedClient::onLoggingOut);
+    }
+
+    /** A server may have replaced our custom nodes with its own; restore the local config nodes after disconnect. */
+    private static void onLoggingOut(net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent.LoggingOut event) {
+        dev.propulsionteam.computed.customnodes.ComputedCustomNodes.reload();
     }
 
     private static void onRegisterClientCommands(RegisterClientCommandsEvent event) {
