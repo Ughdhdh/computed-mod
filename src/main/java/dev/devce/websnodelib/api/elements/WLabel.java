@@ -3,6 +3,7 @@ package dev.devce.websnodelib.api.elements;
 import dev.devce.websnodelib.api.WElement;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.Minecraft;
+import net.neoforged.fml.loading.FMLEnvironment;
 
 public class WLabel extends WElement {
     private String text;
@@ -15,7 +16,7 @@ public class WLabel extends WElement {
     public WLabel(String text, int color) {
         this.text = text;
         this.color = color;
-        this.width = Minecraft.getInstance().font.width(text);
+        this.width = measureTextWidth(text);
         this.height = 10;
     }
 
@@ -26,6 +27,14 @@ public class WLabel extends WElement {
 
     public void setText(String text) {
         this.text = text;
-        this.width = Minecraft.getInstance().font.width(text);
+        this.width = measureTextWidth(text);
+    }
+
+    private static int measureTextWidth(String text) {
+        if (FMLEnvironment.dist.isDedicatedServer()) {
+            return Math.max(8, text.length() * 6);
+        }
+        Minecraft mc = Minecraft.getInstance();
+        return mc == null ? Math.max(8, text.length() * 6) : mc.font.width(text);
     }
 }

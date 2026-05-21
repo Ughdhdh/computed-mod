@@ -101,7 +101,15 @@ public final class ComputedNetworking {
             }
             BlockEntity be = player.level().getBlockEntity(pos);
             if (be instanceof ComputerBlockEntity computer) {
-                computer.applyGraphFromNetwork(payload.graphTag());
+                try {
+                    computer.applyGraphFromNetwork(payload.graphTag());
+                } catch (Exception e) {
+                    Computed.LOGGER.error(
+                            "Failed to apply graph save from {} at {}",
+                            player.getGameProfile().getName(),
+                            pos,
+                            e);
+                }
             } else {
                 Computed.LOGGER.debug(
                         "Rejected graph save from {} at {} (no ComputerBlockEntity)",

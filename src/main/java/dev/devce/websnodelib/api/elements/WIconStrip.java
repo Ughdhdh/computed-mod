@@ -5,6 +5,7 @@ import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.resources.ResourceLocation;
+import net.neoforged.fml.loading.FMLEnvironment;
 
 /**
  * Horizontally tiles same-sized UI textures (typically 16×16) then optional text, for inline shortcut
@@ -29,16 +30,17 @@ public class WIconStrip extends WElement {
         this.suffixColor = suffixColor;
         this.iconDraw = iconDraw;
         this.iconGap = iconGap;
-        var font = Minecraft.getInstance().font;
+        int suffixWidth = measureTextWidth(suffix);
+        int lineHeight = measureLineHeight();
         int w = 0;
         for (int i = 0; i < this.icons.size(); i++) {
             w += iconDraw + (i < this.icons.size() - 1 ? iconGap : 0);
         }
         if (!suffix.isEmpty()) {
-            w += 3 + font.width(suffix);
+            w += 3 + suffixWidth;
         }
         this.width = w;
-        this.height = Math.max(iconDraw, font.lineHeight);
+        this.height = Math.max(iconDraw, lineHeight);
     }
 
     @Override
@@ -63,5 +65,21 @@ public class WIconStrip extends WElement {
             int ty = y + (iconDraw - font.lineHeight) / 2 + 1;
             graphics.drawString(font, suffix, cx, ty, suffixColor, false);
         }
+    }
+
+    private static int measureTextWidth(String text) {
+        if (FMLEnvironment.dist.isDedicatedServer()) {
+            return Math.max(8, text.length() * 6);
+        }
+        Minecraft mc = Minecraft.getInstance();
+        return mc == null ? Math.max(8, text.length() * 6) : mc.font.width(text);
+    }
+
+    private static int measureLineHeight() {
+        if (FMLEnvironment.dist.isDedicatedServer()) {
+            return 9;
+        }
+        Minecraft mc = Minecraft.getInstance();
+        return mc == null ? 9 : mc.font.lineHeight;
     }
 }
