@@ -10,12 +10,10 @@ import dev.propulsionteam.computed.content.monitors.widgets.LayoutManagedWidget;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class ButtonWidgetNode extends WNode implements InteractiveWidgetNode {
-    private static final int PULSE_EVALUATIONS = 2;
-
-    private final AtomicInteger pulseEvaluationsRemaining = new AtomicInteger(0);
+    private final AtomicBoolean pendingPulse = new AtomicBoolean(false);
     private final WidgetLayoutFields layout =
             new WidgetLayoutFields(0, 0, 60, 20, LayoutManagedWidget.Fit.AUTO);
 
@@ -33,15 +31,13 @@ public final class ButtonWidgetNode extends WNode implements InteractiveWidgetNo
             n.getOutputs().get(0).setWidgetValue(
                     layout.wrap(new ButtonWidget(n.getId(), layout.x(), layout.y(), layout.width(), layout.height(),
                             label == null ? "" : label, color)));
-            int remaining = pulseEvaluationsRemaining.getAndUpdate(v -> Math.max(0, v - 1));
-            n.getOutputs().get(1).setValue(remaining > 0 ? 1.0 : 0.0);
+            n.getOutputs().get(1).setValue(pendingPulse.getAndSet(false) ? 1.0 : 0.0);
         });
     }
 
     @Override
     public void onWidgetInput(double value) {
-        pulseEvaluationsRemaining.updateAndGet(v -> Math.max(v, PULSE_EVALUATIONS));
-        getOutputs().get(1).setValue(1.0);
+        pendingPulse.set(true);
     }
 
     @Override
