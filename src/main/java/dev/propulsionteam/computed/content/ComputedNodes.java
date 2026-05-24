@@ -7,6 +7,7 @@ import dev.propulsionteam.computed.content.nodes.vanilla.BlockPresenceNode;
 import dev.propulsionteam.computed.content.nodes.vanilla.BlockRotationNode;
 import dev.propulsionteam.computed.content.nodes.vanilla.ComparatorReadNode;
 import dev.propulsionteam.computed.content.nodes.vanilla.ConcatenateTextNode;
+import dev.propulsionteam.computed.content.nodes.vanilla.CommandNode;
 import dev.propulsionteam.computed.content.nodes.vanilla.IfNode;
 import dev.propulsionteam.computed.content.nodes.vanilla.RedstoneInputNode;
 import dev.propulsionteam.computed.content.nodes.vanilla.RedstonePortNode;
@@ -48,6 +49,7 @@ public final class ComputedNodes {
         // logic > comparison (under websnodelib's existing Logic category)
         IfNode.register();
         SwitchNode.register();
+        CommandNode.register();
 
         // sources
         TextSourceNode.register();

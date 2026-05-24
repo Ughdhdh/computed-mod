@@ -16,6 +16,8 @@ public final class ComputedMenuCategories {
             ResourceLocation.fromNamespaceAndPath(Computed.MODID, "menu_widgets");
     public static final ResourceLocation PERIPHERALS =
             ResourceLocation.fromNamespaceAndPath(Computed.MODID, "menu_peripherals");
+    public static final ResourceLocation CREATIVE =
+            ResourceLocation.fromNamespaceAndPath(Computed.MODID, "menu_creative");
 
     private ComputedMenuCategories() {}
 
@@ -23,6 +25,7 @@ public final class ComputedMenuCategories {
         NodeMenuRegistry.registerCategory(VANILLA, Component.literal("Vanilla"), NodeMenuRegistry.ROOT);
         NodeMenuRegistry.registerCategory(WIDGETS, Component.literal("Widgets"), NodeMenuRegistry.ROOT);
         NodeMenuRegistry.registerCategory(PERIPHERALS, Component.literal("Peripherals"), NodeMenuRegistry.ROOT);
+        NodeMenuRegistry.registerCategory(CREATIVE, Component.literal("Creative"), NodeMenuRegistry.ROOT);
     }
 
     public static void registerCreateCategories() {

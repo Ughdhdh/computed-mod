@@ -1,6 +1,7 @@
 {
   "itemGroup.computed": "Computed",
   "block.computed.computer": "Computer",
+  "block.computed.creative_computer": "Creative Computer",
   "block.computed.monitor": "Monitor",
   "item.computed.computer.stored": "Stored Program — %s nodes, %s functions",
 

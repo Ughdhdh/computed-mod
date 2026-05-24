@@ -170,7 +170,7 @@ public class ComputerBlock extends Block implements EntityBlock {
                 && level.getBlockEntity(pos) instanceof ComputerBlockEntity be
                 && be.hasStoredState()) {
             be.getOrCreateUuid();
-            ItemStack stack = new ItemStack(ComputedRegistries.COMPUTER_BLOCK_ITEM.get());
+            ItemStack stack = new ItemStack(this.asItem());
             CompoundTag beTag = be.saveCustomOnly(level.registryAccess());
             if (!beTag.isEmpty()) {
                 net.minecraft.world.item.BlockItem.setBlockEntityData(stack, be.getType(), beTag);
