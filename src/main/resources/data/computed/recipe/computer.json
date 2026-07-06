@@ -11,7 +11,7 @@
       "item": "minecraft:redstone"
     },
     "C": {
-      "item": "create:redstone_link"
+      "item": "minecraft:lightning_rod"
     },
     "I": {
       "item": "minecraft:copper_ingot"
